@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: traderx
+      POSTGRES_USER: traderx
+      POSTGRES_PASSWORD: ${TRADERX_DATABASE_PASSWORD:?Set a local database password in your shell before Compose}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U traderx -d traderx]
+      interval: 5s
+      retries: 10
+  redis:
+    image: redis:8-alpine
+    command: [redis-server, --appendonly, 'yes']
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      retries: 10
+  backend:
+    build:
+      context: .
+      dockerfile: infrastructure/backend.Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://traderx:${TRADERX_DATABASE_PASSWORD}@postgres:5432/traderx
+      REDIS_URL: redis://redis:6379/0
+      LOCAL_LLM_BASE_URL: http://host.docker.internal:1234/v1
+    ports: ['127.0.0.1:8000:8000']
+    volumes: ['./data:/app/data', './secrets:/app/secrets:ro']
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/frontend.Dockerfile
+    ports: ['127.0.0.1:3000:3000']
+    depends_on: [backend]
+volumes:
+  postgres_data:
+  redis_data:

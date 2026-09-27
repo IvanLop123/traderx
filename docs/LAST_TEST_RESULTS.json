@@ -1,0 +1,212 @@
+{
+  "generated_at_utc": "2026-09-27T16:57:01.399035+00:00",
+  "billable_tests_enabled": false,
+  "no_trading_routes": true,
+  "results": [
+    {
+      "provider": "OPENAI",
+      "status": "DISABLED",
+      "diagnostic": "LLM_PROVIDER=off; no OpenAI requests made",
+      "checks_passed": [],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:56:52.950535+00:00",
+      "required": false,
+      "sdk_version": "3.19.2",
+      "model": "gpt-5.4-nano",
+      "configured_endpoint": "https://api.openai.com/v1/responses"
+    },
+    {
+      "provider": "ALPACA_PAPER",
+      "status": "NOT_CONFIGURED",
+      "diagnostic": "Missing ALPACA_API_KEY, ALPACA_API_SECRET",
+      "checks_passed": [],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:56:52.956230+00:00",
+      "required": false
+    },
+    {
+      "provider": "ALPHA_VANTAGE",
+      "status": "NOT_CONFIGURED",
+      "diagnostic": "Missing ALPHA_VANTAGE_API_KEY",
+      "checks_passed": [],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:56:52.960150+00:00",
+      "required": false
+    },
+    {
+      "provider": "SEC_EDGAR",
+      "status": "NOT_CONFIGURED",
+      "diagnostic": "Missing SEC_USER_AGENT",
+      "checks_passed": [],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:56:52.964242+00:00",
+      "required": false
+    },
+    {
+      "provider": "FRED",
+      "status": "NOT_CONFIGURED",
+      "diagnostic": "Missing FRED_API_KEY",
+      "checks_passed": [],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:56:52.969254+00:00",
+      "required": false
+    },
+    {
+      "provider": "EIA",
+      "status": "NOT_CONFIGURED",
+      "diagnostic": "Missing EIA_API_KEY",
+      "checks_passed": [],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:56:52.974084+00:00",
+      "required": false
+    },
+    {
+      "provider": "X",
+      "status": "REQUIRES_PAYMENT_APPROVAL",
+      "diagnostic": "REQUIRES_PAID_ACCESS; disabled under zero-spend policy",
+      "checks_passed": [],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:56:52.978207+00:00",
+      "required": false
+    },
+    {
+      "provider": "KALSHI_PUBLIC_DEMO",
+      "status": "WORKING_DEMO",
+      "diagnostic": "Public demo market listing, details and order-book schema; account auth not tested",
+      "checks_passed": [
+        "demo market listing",
+        "demo market details",
+        "demo order book response"
+      ],
+      "authentication_verified": false,
+      "requests": [
+        {
+          "method": "GET",
+          "endpoint": "https://external-api.demo.kalshi.co/trade-api/v2/markets",
+          "http_status": 200
+        },
+        {
+          "method": "GET",
+          "endpoint": "https://external-api.demo.kalshi.co/trade-api/v2/markets/KXDOTA2GAME-26SEP270855NAVITY-TY",
+          "http_status": 200
+        },
+        {
+          "method": "GET",
+          "endpoint": "https://external-api.demo.kalshi.co/trade-api/v2/markets/KXDOTA2GAME-26SEP270855NAVITY-TY/orderbook",
+          "http_status": 200
+        }
+      ],
+      "timestamp_utc": "2026-09-27T16:56:55.267236+00:00",
+      "required": false
+    },
+    {
+      "provider": "KALSHI_DEMO",
+      "status": "NOT_CONFIGURED",
+      "diagnostic": "Missing KALSHI_API_KEY_ID",
+      "checks_passed": [],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:56:55.273732+00:00",
+      "required": false
+    },
+    {
+      "provider": "COINBASE_PUBLIC",
+      "status": "WORKING_READ_ONLY",
+      "diagnostic": "BTC-USD public market metadata and price; no account credential required",
+      "checks_passed": [
+        "BTC-USD public product and price"
+      ],
+      "authentication_verified": false,
+      "requests": [
+        {
+          "method": "GET",
+          "endpoint": "https://api.coinbase.com/api/v3/brokerage/market/products/BTC-USD",
+          "http_status": 200
+        }
+      ],
+      "timestamp_utc": "2026-09-27T16:56:55.410942+00:00",
+      "required": true
+    },
+    {
+      "provider": "COINBASE_ACCOUNT",
+      "status": "NOT_CONFIGURED",
+      "diagnostic": "Missing COINBASE_API_KEY_NAME",
+      "checks_passed": [],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:56:55.420675+00:00",
+      "required": false
+    },
+    {
+      "provider": "HYPERLIQUID_PUBLIC",
+      "status": "WORKING_READ_ONLY",
+      "diagnostic": "Metadata, mids, book and public sample vault reads verified; fills may be empty",
+      "checks_passed": [
+        "perpetual metadata",
+        "BTC mid price",
+        "BTC order book",
+        "public sample vault fills schema",
+        "public sample vault portfolio"
+      ],
+      "authentication_verified": false,
+      "requests": [
+        {
+          "method": "POST",
+          "endpoint": "https://api.hyperliquid.xyz/info",
+          "http_status": 200
+        },
+        {
+          "method": "POST",
+          "endpoint": "https://api.hyperliquid.xyz/info",
+          "http_status": 200
+        },
+        {
+          "method": "POST",
+          "endpoint": "https://api.hyperliquid.xyz/info",
+          "http_status": 200
+        },
+        {
+          "method": "POST",
+          "endpoint": "https://api.hyperliquid.xyz/info",
+          "http_status": 200
+        },
+        {
+          "method": "POST",
+          "endpoint": "https://api.hyperliquid.xyz/info",
+          "http_status": 200
+        }
+      ],
+      "timestamp_utc": "2026-09-27T16:57:00.023020+00:00",
+      "required": true
+    },
+    {
+      "provider": "GS_QUANT",
+      "status": "WORKING",
+      "diagnostic": "Local calculation verified without Goldman credentials; version 2.1.17",
+      "checks_passed": [
+        "standalone timeseries calculation"
+      ],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:57:01.394763+00:00",
+      "required": true
+    },
+    {
+      "provider": "INVO",
+      "status": "NO_AUTHORIZED_API",
+      "diagnostic": "No authorized public API identified; no automated extraction attempted",
+      "checks_passed": [],
+      "authentication_verified": false,
+      "requests": [],
+      "timestamp_utc": "2026-09-27T16:57:01.399027+00:00",
+      "required": false
+    }
+  ]
+}

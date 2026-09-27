@@ -1,0 +1,1 @@
+{"enabled":true,"equities":["AAPL","MSFT","NVDA"],"sec_ciks":{"AAPL":"0000320193","MSFT":"0000789019","NVDA":"0001045810"},"fred_series":["FEDFUNDS","UNRATE","T10Y2Y","CPIAUCSL"],"poll_seconds":{"alpaca":60,"sec":1800,"alpha_vantage":21600,"fred":21600,"eia":86400},"max_filings_per_company":3,"lookback_days":730}

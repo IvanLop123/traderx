@@ -1,0 +1,2 @@
+# Optional legacy Phase 0 OpenAI smoke-test SDK. App uses HTTPX.
+openai==3.19.2

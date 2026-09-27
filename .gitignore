@@ -1,0 +1,92 @@
+# Real environment files
+.env
+.env.*
+!.env.example
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.p8
+*.secret
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# macOS
+.DS_Store
+__MACOSX/
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+docs/LAST_TARGETED_RESULTS.json
+
+# Future frontend build outputs
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Local editor settings
+.vscode/
+.idea/
+
+# Application state and research artifacts
+data/
+*.db
+*.db-wal
+*.db-shm
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Local tooling, reports, databases, model artifacts, credentials and OS files
+.codex/
+.openai/
+.envrc
+.npmrc
+*.p12
+*.pfx
+*.jks
+*.keystore
+service_key.json
+*service-account*.json
+credentials.json
+credentials/
+*.sqlite
+*.sqlite3
+*.duckdb
+*.parquet
+*.arrow
+*.feather
+*.pkl
+*.pickle
+*.joblib
+*.onnx
+*.pt
+*.safetensors
+*.csv
+*.tsv
+*.zip
+*.tar.gz
+*.dmg
+*.app/
+.jupyter/
+.ipynb_checkpoints/
+.pyre/
+htmlcov/
+.coverage
+*.lcov
+npm-debug.log*
+yarn-error.log*
+frontend/.turbo/
+frontend/.vercel/

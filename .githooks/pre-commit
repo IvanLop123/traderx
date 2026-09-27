@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+if [ ! -x .venv/bin/python ]; then
+  echo 'TraderX: activate the local Python environment before committing so the credential audit can run.' >&2
+  exit 1
+fi
+exec .venv/bin/python -B scripts/api_setup/check_repository.py
