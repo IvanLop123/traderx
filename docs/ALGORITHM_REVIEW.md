@@ -13,8 +13,9 @@ costs and sufficient unseen evidence. The present models are research baselines.
    https://www.aqr.com/insights/research/journal-article/a-century-of-evidence-on-trend-following-investing
 2. Bailey, Borwein, López de Prado and Zhu, *The Probability of Backtest Overfitting*.
    Repeated strategy selection can make attractive backtests misleading. TraderX
-   retains trials and marks reused holdouts exploratory; it does not claim to have
-   implemented their complete CSCV/PBO procedure.
+   retains trials and marks reused holdouts exploratory. An eight-block CSCV
+   diagnostic now examines the four fixed development strategies (70 partitions);
+   it does not account for undocumented trials or establish future performance.
    https://www.davidhbailey.com/dhbpapers/backtest-prob.pdf
 3. Bailey and López de Prado, *The Deflated Sharpe Ratio*.
    Selection bias and non-normal returns matter. The app reports a probabilistic
@@ -39,7 +40,7 @@ costs and sufficient unseen evidence. The present models are research baselines.
 - Require return and probability forecasts to beat simple benchmark errors before
   generating a research candidate. Require at least 200 holdout observations.
 - Retain NO_TRADE, separate risk approval and internal paper execution. No model
-  or LLM receives a route to external orders.
+  or LLM can bypass approval or call an external order adapter directly.
 - Download three years of available public daily spot history in bounded requests;
   distinguish retrospective history from actual first-observed replay.
 
@@ -60,7 +61,42 @@ forecast MSE result is not the return of a tradable forecast strategy.
 
 Corporate actions, delisted assets, historical universe membership, revised source
 data, measured market impact, derivatives lifecycle, broad cross-market validation,
-full multiple-testing correction and independent forward paper history require
-additional data and engineering. Raw equity bars are explicitly unadjusted; stock
+independent forward paper history require additional source access and accrued
+observations. Declared-family trial accounting and explicit historical dataset
+coverage gates are now implemented; they do not certify source completeness. Raw equity bars are explicitly unadjusted; stock
 backtests crossing splits/dividends are unsuitable without the appropriate policy.
 No current result establishes a durable or institutional-quality trading edge.
+
+## Additional review and implemented checks
+
+- Circular moving-block bootstrap (999 replicates, block length 10) reports a 95%
+  interval for mean daily return and an approximate centered-null one-sided p-value.
+  Weak stationarity and sufficient dependence capture are assumptions, not facts.
+- Benjamini–Yekutieli adjustment covers the declared strategy family. It does not
+  fix invalid p-values or repeated use of a holdout. Official implementation:
+  https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.false_discovery_control.html
+- Ridge, a bounded random forest and histogram gradient boosting compete against
+  a zero-return forecast using fixed settings and a chronological purged split.
+  Automatic early stopping is disabled to avoid its internal temporal shuffle:
+  https://sklearn.org/stable/auto_examples/ensemble/plot_hgbt_regression.html
+
+The September 27 five-day BTC forecast comparison selected the zero-return baseline
+on validation. Its validation/holdout MSE was approximately 0.002384/0.002684; none
+of the three fitted challengers improved both. All four strategy mean-return
+bootstrap intervals included zero, and within-family adjusted p-values were 1.0.
+The development CSCV below-median fraction was 50%. This sample does not establish
+a reliable edge. Records, periods and parameters are saved in the local database.
+
+## Declared experiment follow-through
+
+The September 28 review added immutable experiment definitions, separate holdout
+release, per-asset nonoverlapping labels, source-availability joins, circular-shift
+IC diagnostics and BY accounting that includes failed/unreleased/repeated attempts.
+The first BTC/ETH/SOL five-day momentum experiment had validation rank correlation
+approximately zero and mean cost-adjusted long event return of -1.44%. This does
+not support promoting that signal. Its holdout release is recorded permanently.
+These diagnostics do not resolve survivorship, data revisions or future regimes.
+
+Primary sources rechecked: [time-series splitting](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.TimeSeriesSplit.html),
+[backtest overfitting](https://www.davidhbailey.com/dhbpapers/backtest-prob.pdf),
+and [trading-cost research](https://www.aqr.com/insights/research/working-paper/trading-costs).

@@ -21,3 +21,56 @@ async def test_postgres_transactions_provenance_and_ai_off():
     assert db.get(stored['id'])['kind']=='document'
     db.set_setting('ai',AISettings().model_dump())
     assert (await LLMService(db,{}).analyze(TextTask(task='news',text='Revenue growth',source_reference='fixture')))['status']=='DISABLED'
+
+
+
+def test_postgres_qualification_full_path_isolated_schema():
+    from uuid import uuid4
+    from sqlalchemy import text
+    from backend.storage.database import Base
+    import test_qualification as qualification
+    assert URL.endswith('traderx_acceptance')
+    schema='qualification_test_'+uuid4().hex
+    db=Database(URL);original=db.engine
+    with original.begin() as conn:conn.execute(text('CREATE SCHEMA '+schema))
+    try:
+        db.engine=original.execution_options(schema_translate_map={None:schema})
+        Base.metadata.create_all(db.engine)
+        qualification.test_full_source_qualification_and_registry_path(db)
+    finally:
+        with original.begin() as conn:conn.execute(text('DROP SCHEMA '+schema+' CASCADE'))
+        original.dispose()
+
+def test_postgres_market_structure_storage_isolated_schema():
+    from uuid import uuid4
+    from sqlalchemy import text
+    from backend.storage.database import Base
+    from backend.research.structure.collector import Collector
+    from backend.ensemble.lifecycle import Recommendations
+    from test_ensemble import evidence
+    from test_personal_paper import Market
+    assert URL.endswith('traderx_acceptance')
+    schema='structure_test_'+uuid4().hex;db=Database(URL);original=db.engine
+    with original.begin() as c:c.execute(text('CREATE SCHEMA '+schema))
+    try:
+        db.engine=original.execution_options(schema_translate_map={None:schema});Base.metadata.create_all(db.engine)
+        collector=Collector(db,None);rid=collector.save('structure_raw',{'test':'postgres'},'');assert db.get(rid)
+        db.set_setting('model_opportunities',{'rows':[evidence()],'assets':{'BTC-USD':Market().lookup('BTC-USD')}});assert len(Recommendations(db).cycle())==1;assert Recommendations(db).cycle()==[]
+    finally:
+        with original.begin() as c:c.execute(text('DROP SCHEMA '+schema+' CASCADE'))
+        original.dispose()
+
+def test_postgres_alpha_registry_isolated_schema():
+    from uuid import uuid4
+    from sqlalchemy import text
+    from backend.storage.database import Base
+    import test_alpha
+    assert URL.endswith('traderx_acceptance')
+    schema='alpha_test_'+uuid4().hex;db=Database(URL);original=db.engine
+    with original.begin() as c:c.execute(text('CREATE SCHEMA '+schema))
+    try:
+        db.engine=original.execution_options(schema_translate_map={None:schema});Base.metadata.create_all(db.engine)
+        test_alpha.test_alpha_versioning_preserves_old_definition_and_excludes_variants(db)
+    finally:
+        with original.begin() as c:c.execute(text('DROP SCHEMA '+schema+' CASCADE'))
+        original.dispose()

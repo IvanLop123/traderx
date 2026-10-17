@@ -1,10 +1,5 @@
 # Risk, execution and security
 
-Live exchange execution has no application endpoint or submission implementation.
-Even setting a live flag cannot activate it. The delivered execution venue is an
-internal simulator. Original provider setup flags remain disabled and paper/demo-only.
-No real, Alpaca-paper or Kalshi-demo orders were submitted during development.
-
 The internal portfolio begins with explicitly simulated $100,000 cash and no
 positions. The kill switch starts engaged. Resume affects only internal simulation.
 STOP ALL TRADING blocks new fills immediately; it does not liquidate positions.

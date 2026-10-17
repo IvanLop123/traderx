@@ -6,6 +6,7 @@ from backend.schemas.contracts import Contract, uid, now
 from backend.storage.database import LLMRun
 from backend.llm.providers import Extraction, provider_for
 from backend.llm.service import SYSTEM, digest, stats_from
+from backend.intelligence.semantic import validate_quotes
 from scripts.provider_common import ROOT
 
 class BatchItem(Extraction):
@@ -17,8 +18,8 @@ async def batch_analyze(service,tasks):
     settings=service.settings()
     if len(tasks)<2 or settings.provider=='off' or not settings.automated:
         return [await service.analyze(t) for t in tasks]
-    # Chat and difficult tasks remain individually routed; routine short texts can batch.
-    if any(t.task!=tasks[0].task or not t.automated or t.difficult or t.task=='chat' for t in tasks):
+    # Difficult tasks remain individually routed; routine short texts can batch.
+    if any(t.task!=tasks[0].task or not t.automated or t.difficult for t in tasks):
         return [await service.analyze(t) for t in tasks]
     words=[x.lower() for x in settings.watch_terms]
     if any(t.task in ('news','theme','summary') and not any(w in t.text.lower() for w in words) for t in tasks):
@@ -36,6 +37,8 @@ async def batch_analyze(service,tasks):
     text=json.dumps([{'document_id':digest(t.text),'text':t.text,'task':t.task} for t in tasks])
     if len(text)>settings.max_input_chars: return [await service.analyze(t) for t in tasks]
     input_bound=len((system+text).encode())+1024; output_bound=settings.max_output_tokens
+    if provider.name=='openai' and price.get('input_bound_limit') and input_bound>price['input_bound_limit']:
+        return [await service.analyze(t) for t in tasks]
     reserve=(input_bound*price['input']+output_bound*price['output'])/1e6 if provider.name=='openai' else 0
     ids=[]; fallback=False
     with service.db.transaction() as s:
@@ -60,7 +63,7 @@ async def batch_analyze(service,tasks):
         results=[]
         for rid,t in zip(ids,tasks):
             item=by_id[digest(t.text)]
-            if any(f.quote not in t.text for f in item.findings): raise ValueError('Unsupported quote')
+            validate_quotes(item,t.text)
             extraction=item.model_dump(exclude={'document_id'})
             payload={'run_id':rid,'batch_call_id':ids[0],'provider':provider.name,'model':completion.model,'configured_model':provider.model,
                      'prompt_version':settings.prompt_version,'input_hash':digest(t.text),'output_hash':digest(json.dumps(extraction,sort_keys=True)),

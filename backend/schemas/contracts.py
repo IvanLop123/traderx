@@ -10,7 +10,7 @@ class Contract(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
 
 class AssetIdentifier(Contract):
-    symbol: str = Field(min_length=1, max_length=40, pattern=r'^[A-Za-z0-9_.:/-]+$')
+    symbol: str = Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9_.:/-]+$')
     asset_class: Literal['stock','etf','option','crypto','perpetual','prediction'] = 'crypto'
     exchange: str | None = None
     cik: str | None = None
@@ -131,7 +131,7 @@ class ApprovedOrder(Contract):
     quantity: float = Field(gt=0)
     limit_price: float = Field(gt=0)
     expires_at: AwareDatetime
-    venue: Literal['internal_paper'] = 'internal_paper'
+    venue: Literal['internal_paper','alpaca_paper'] = 'internal_paper'
 
 class RejectedOrder(Contract):
     candidate_id: str

@@ -1,0 +1,5 @@
+# Optional advanced lab only; ordinary TraderX does not import these at startup.
+torch==2.14.1
+arch==8.0.0
+hmmlearn==0.3.3
+statsmodels==0.15.0

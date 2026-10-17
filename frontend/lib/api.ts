@@ -1,4 +1,11 @@
-export async function api(path: string, body?: unknown, method = "POST") {
+// Share only concurrent board reads. Never cache responses or executable quotes.
+const boardReads=new Map<string,Promise<any>>();
+export function api(path:string,body?:unknown,method="POST"):Promise<any>{
+  if(body!==undefined||path!=="/product/cockpit")return request(path,body,method);
+  const pending=boardReads.get(path);if(pending)return pending;
+  const work=request(path).finally(()=>boardReads.delete(path));boardReads.set(path,work);return work;
+}
+async function request(path: string, body?: unknown, method = "POST") {
   const response = await fetch(
     "/api/v1" + path,
     body === undefined

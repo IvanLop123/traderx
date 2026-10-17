@@ -1,7 +1,7 @@
 """Append-only research records, durable cache/usage, and transactional paper state."""
 from contextlib import contextmanager
 from datetime import datetime
-from sqlalchemy import create_engine, String, Float, Integer, Text, JSON, select, event
+from sqlalchemy import create_engine, Index, String, Float, Integer, Text, JSON, select, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
 from sqlalchemy.pool import StaticPool
 from backend.core.config import database_url
@@ -11,9 +11,10 @@ class Base(DeclarativeBase): pass
 
 class Record(Base):
     __tablename__ = 'records'
+    __table_args__ = (Index('ix_records_kind_created','kind','created_at'), Index('ix_records_kind_available','kind','available_at'), Index('ix_records_kind_symbol_created','kind','symbol','created_at'))
     id: Mapped[str] = mapped_column(String(128), primary_key=True, default=uid)
     kind: Mapped[str] = mapped_column(String(40), index=True)
-    symbol: Mapped[str] = mapped_column(String(50), default='', index=True)
+    symbol: Mapped[str] = mapped_column(String(128), default='', index=True)
     created_at: Mapped[str] = mapped_column(String(40), default=lambda: now().isoformat(), index=True)
     available_at: Mapped[str] = mapped_column(String(40), index=True)
     payload: Mapped[dict] = mapped_column(JSON)

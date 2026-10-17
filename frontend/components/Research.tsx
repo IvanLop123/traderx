@@ -1,4 +1,10 @@
 "use client";
+import { StrategyFamilies } from "./StrategyFamilies";
+import { ModelLab } from "./ModelLab";
+import { ExperimentLab } from "./ExperimentLab";
+import { ModelRegistry } from "./ModelRegistry";
+import { TrainingSchedule } from "./TrainingSchedule";
+import { PortfolioReplay } from "./PortfolioReplay";
 import { ResearchSummary } from "./ResearchSummary";
 import { useEffect, useState, useCallback } from "react";
 import { FlaskConical, Loader2 } from "lucide-react";
@@ -33,7 +39,7 @@ export function Research({
           ? "experiment"
           : "backtest";
   const load = useCallback(
-    () => api("/records/" + kind).then(setRecords),
+    () => Promise.all((kind === "model" ? ["model","model_comparison"] : kind === "backtest" ? ["backtest","replay"] : [kind]).map(k=>api("/records/"+k))).then(groups=>setRecords(groups.flat().sort((a,b)=>b.created_at.localeCompare(a.created_at)))),
     [kind],
   );
   useEffect(() => {
@@ -44,7 +50,9 @@ export function Research({
     const r = await act(
       () =>
         api(
-          type === "model"
+          type === "model-compare"
+            ? "/research/model-comparison"
+            : type === "model"
             ? "/models/train"
             : type === "experiment"
               ? "/experiments"
@@ -77,6 +85,10 @@ export function Research({
         training uses chronological training, validation and holdout periods
         with a purged boundary.
       </div>
+      {(page === "experiments" || page === "research") && <ExperimentLab act={act} onInspect={onInspect} />}
+      {page === "models" && <ModelLab act={act}/>}
+      {page === "strategies" && <StrategyFamilies/>}
+      <details open={page !== "models"}><summary className="section-copy">{page === "models" ? "Existing baseline models, schedules and advanced research tools" : "Research tools"}</summary>
       <Panel
         title={
           page === "strategies"
@@ -180,6 +192,7 @@ export function Research({
           >
             Compare & stress-test
           </button>
+          <button disabled={running} className="button secondary" onClick={()=>run("model-compare")}>Compare forecasting models</button>
           {running && <Loader2 className="spin" size={18} />}
         </div>
         <p className="panel-note">
@@ -188,6 +201,7 @@ export function Research({
           revision safety. No strategy automatically trades.
         </p>
       </Panel>
+      {(page === "backtests" || page === "strategies") && <PortfolioReplay act={act} onInspect={onInspect} />}
       {result && (
         <Panel
           title="Run results"
@@ -203,7 +217,7 @@ export function Research({
             </div>
           }
         >
-          {result.strategies ? (
+          {result.model_comparison ? <><div className="table-scroll"><table><thead><tr><th>FORECASTER</th><th>VALIDATION ERROR</th><th>HOLDOUT ERROR</th></tr></thead><tbody>{result.model_comparison.map((r:Data)=><tr key={r.model}><td>{r.model.replaceAll("_"," ")}</td><td>{number(r.validation_mse,8)}</td><td>{number(r.holdout_mse,8)}</td></tr>)}</tbody></table></div><p className="panel-note">Selected using validation only: {result.selected_on_validation_only}. Lower error is better. A zero-return estimate is a valid winner. Fixed settings; no automatic activation.</p><p className="panel-note">{result.warnings.join(" ")}</p></> : result.strategies ? (
             <>
               <div className="table-scroll">
                 <table>
@@ -235,6 +249,7 @@ export function Research({
                 {result.walk_forward_folds.length} purged walk-forward folds.
                 Research only; no automatic trading.
               </p>
+              {result.statistical_governance && <><div className="table-scroll"><table><thead><tr><th>STRATEGY</th><th>MEAN DAILY RETURN RANGE</th><th>ADJUSTED P-VALUE</th></tr></thead><tbody>{Object.entries(result.statistical_governance.tests).map(([name,r]:[string,any])=><tr key={name}><td>{name.replaceAll("_"," ")}</td><td>{r.mean_daily_return_ci_95?.map((v:number)=>pct(v)).join(" to ")||"Insufficient observations"}</td><td>{number(r.adjusted_p_value_by,4)}</td></tr>)}</tbody></table></div><p className="panel-note">95% block-bootstrap intervals with within-family multiple-testing adjustment. Development CSCV fraction below the out-of-sample median: {pct(result.development_cscv?.probability_below_oos_median)}. These are exploratory diagnostics, not evidence of future profit.</p></>}
               <details className="panel-note">
                 <summary>
                   Evaluation periods, fold results and limitations
@@ -243,6 +258,8 @@ export function Research({
                   value={{
                     split: result.split,
                     walk_forward: result.walk_forward_folds,
+                    statistical_governance:result.statistical_governance,
+                    development_cscv:result.development_cscv,
                     warnings: result.warnings,
                   }}
                 />
@@ -275,11 +292,11 @@ export function Research({
               <Plot
                 data={result.curve}
                 value="equity"
-                second="benchmark"
+                second={result.engine ? undefined : "benchmark"}
                 height={300}
               />
               <p className="panel-note">
-                Green: strategy. Blue: buy-and-hold benchmark.{" "}
+                {result.engine ? "Marked portfolio equity; open positions remain at final marks. " : "Copper: strategy. Slate: buy-and-hold benchmark. "}
                 {result.data_policy}
               </p>
             </>
@@ -288,6 +305,7 @@ export function Research({
           )}
         </Panel>
       )}
+      {page === "models" && <><TrainingSchedule act={act} /><ModelRegistry act={act} /></>}
       <Panel title="Saved research history" eyebrow="APPEND-ONLY RESULTS">
         <Records
           records={records}
@@ -297,6 +315,7 @@ export function Research({
           }}
         />
       </Panel>
+      </details>
     </>
   );
 }

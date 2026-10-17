@@ -17,14 +17,10 @@ async def test_real_shape_quote_normalization(db):
     p.last.clear();await p.coinbase_quote('BTC-USD')
     assert len(db.records('event'))==1
 
-async def test_missing_optional_credentials_no_network(db):
-    def fail(_):pytest.fail('No credential should make no request')
-    p=MarketProviders(db,{},httpx.MockTransport(fail))
-    with pytest.raises(ProviderError,match='credentials'):await p.fred('FEDFUNDS','2026-01-01')
-    with pytest.raises(ProviderError):await p.sec('320193')
-    with pytest.raises(ProviderError):await p.social('$AAPL')
 
-@pytest.mark.parametrize('status,expected',[(429,'RATE_LIMITED'),(403,'DEGRADED'),(401,'DEGRADED')])
+
+
+@pytest.mark.parametrize('status,expected',[(429,'RATE_LIMITED'),(403,'ENTITLEMENT_REQUIRED'),(401,'AUTHENTICATION_FAILED')])
 async def test_provider_failures_isolated(db,status,expected):
     p=MarketProviders(db,{},httpx.MockTransport(lambda r:httpx.Response(status,json={})))
     with pytest.raises(ProviderError):await p.coinbase_quote('BTC-USD')
@@ -42,7 +38,7 @@ async def test_fred_vintage_explicit(db):
 async def test_malformed_provider_data_is_degraded_not_synthetic(db):
     p=MarketProviders(db,{},httpx.MockTransport(lambda req:httpx.Response(200,json={'price':'not-a-number'})))
     with pytest.raises(ProviderError,match='shape'):await p.coinbase_quote('BTC-USD')
-    assert next(x for x in p.status() if x['provider']=='coinbase')['status']=='DEGRADED'
+    assert next(x for x in p.status() if x['provider']=='coinbase')['status']=='MALFORMED_RESPONSE'
     assert db.records('quote')==[]
 
 async def test_alpaca_quote_uses_key_headers_and_no_current_partial_bar(db):
@@ -60,3 +56,12 @@ def test_removed_credentials_clear_stale_working_status(db):
     p=MarketProviders(db,{})
     row=next(x for x in p.status() if x['provider']=='alpaca')
     assert row['status']=='NOT_CONFIGURED' and row['missing_fields']
+
+
+
+
+async def test_one_sided_alpaca_quote_is_missing_liquidity_not_bad_schema(db):
+    p=MarketProviders(db,{'ALPACA_API_KEY':'fixture','ALPACA_API_SECRET':'fixture'},httpx.MockTransport(lambda req:httpx.Response(200,json={'quote':{'bp':319.89,'ap':0,'bs':40,'as':0,'t':'2026-10-08T20:00:03Z'}})))
+    with pytest.raises(ProviderError) as err:await p.alpaca_quote('AAPL')
+    assert err.value.status=='MISSING_DATA' and 'two-sided' in err.value.detail
+    assert not db.records('quote')

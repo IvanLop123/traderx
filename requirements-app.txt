@@ -1,5 +1,6 @@
-# Standalone TraderX application; no OpenAI SDK required.
+# Standalone TraderX application; cloud-provider SDKs are optional.
 httpx==0.28.1
+websockets==13.1
 python-dotenv==1.2.3
 fastapi==0.141.1
 uvicorn==0.54.0
@@ -15,5 +16,7 @@ scikit-learn==1.9.1
 pyarrow==25.0.1
 pydantic==2.13.5
 defusedxml==0.7.1
+PyJWT==2.15.0
+cryptography==50.0.1
 pytest==9.1.1
 pytest-asyncio==1.4.0

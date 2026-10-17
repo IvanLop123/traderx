@@ -7,7 +7,7 @@ from backend.schemas.contracts import AssetIdentifier,Feature,Signal,now
 from backend.intelligence.transcripts import transcript_research
 from backend.intelligence.documents import institution_changes
 
-VERSION='document-evidence-v3'
+VERSION='document-evidence-v4'
 
 def timestamp(value):
     if isinstance(value,datetime):result=value
@@ -66,6 +66,10 @@ def insider_snapshot(db,symbol,as_of=None):
         if docs and not unresolved:
             metrics.update({f'insider_purchase_count_{days}d':len(buys),f'insider_sale_count_{days}d':len(sales),f'insider_known_buyers_{days}d':len(owners),
                             f'insider_purchase_value_{days}d':buy_value,f'insider_sale_value_{days}d':sell_value})
+            metrics.update({f'insider_officer_purchases_{days}d':sum(any(o.get('officer') for o in t.get('owners',[])) for t in buys),
+                            f'insider_director_purchases_{days}d':sum(any(o.get('director') for o in t.get('owners',[])) for t in buys),
+                            f'insider_repeat_buyers_{days}d':sum(sum(o in t['owner_ids'] for t in buys)>1 for o in owners),
+                            f'insider_cluster_{days}d':int(len(owners)>=2)})
         elif unresolved:
             metrics.update({f'insider_{field}_{days}d':None for field in ('purchase_count','sale_count','known_buyers','purchase_value','sale_value')})
     return {'symbol':symbol,'as_of':cutoff.isoformat(),'status':'AMENDMENT_REVIEW_REQUIRED' if unresolved else 'AVAILABLE' if docs else 'NO_FILINGS',

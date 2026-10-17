@@ -1,1 +1,1 @@
-{"trend_return_threshold":0.03,"high_volatility_threshold":0.60,"candidate_probability_min":0.55,"candidate_fraction":0.02,"estimated_round_trip_cost":0.0012,"candidate_ttl_seconds":300,"momentum_lookback":20,"annual_periods_crypto":365,"annual_periods_equity":252}
+{"trend_return_threshold":0.03,"high_volatility_threshold":0.6,"estimated_round_trip_cost":0.0012,"momentum_lookback":20,"annual_periods_crypto":365,"annual_periods_equity":252}

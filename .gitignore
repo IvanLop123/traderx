@@ -50,8 +50,10 @@ playwright-report/
 test-results/
 
 # Local tooling, reports, databases, model artifacts, credentials and OS files
-.codex/
-.openai/
+# Local hidden tool state; repository automation stays versioned.
+.*/
+!.github/
+!.githooks/
 .envrc
 .npmrc
 *.p12
@@ -90,3 +92,6 @@ npm-debug.log*
 yarn-error.log*
 frontend/.turbo/
 frontend/.vercel/
+
+# Unreviewed research code proposals are private, non-executable review artifacts.
+research/proposals/

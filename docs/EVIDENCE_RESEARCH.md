@@ -51,11 +51,6 @@ outside the implemented scope.
 
 ## Historical options
 
-In System Health / Data Providers select Alpha Vantage → Historical options.
-An optional observation date requests that trading session; blank requests the
-provider's previous trading session. This endpoint requires the corresponding
-provider entitlement. It is explicit, not an automatic paid background workload.
-
 The Options screen summarizes contract counts, complete-side put/call volume and
 open-interest ratios, two-sided quote coverage, median relative spreads, nearby
 50-delta implied volatility by expiry, and 25-delta put-minus-call IV. Delta matching
@@ -85,11 +80,6 @@ Explicit null features invalidate earlier values (including unresolved amendment
 and missing Q&A measures). The as-of join honors both invalidation and expiry.
 
 ## Primary format references
-
-- [SEC Form 4 instructions](https://www.sec.gov/files/form4data.pdf)
-- [SEC Section 16 interpretations](https://www.sec.gov/rules-regulations/staff-guidance/corporation-finance-interpretations/exchange-act-section-16-related-rules-forms)
-- [SEC EDGAR 22.4.1 changes to Form 13F value units](https://content.govdelivery.com/accounts/USSEC/bulletins/3401c41)
-- [Alpha Vantage historical options and transcript API documentation](https://www.alphavantage.co/documentation/)
 
 Provider schema and failure behavior were tested with isolated fixtures. Credentialed
 options/transcript access remains unverified until an entitled account is configured.

@@ -7,7 +7,7 @@ from pydantic import Field
 from backend.schemas.contracts import Contract
 from backend.core.config import AISettings
 
-Task = Literal['transcript','filing','news','contradiction','bottleneck','theme','semantic_disagreement','summary','chat']
+Task = Literal['transcript','filing','news','contradiction','bottleneck','theme','semantic_disagreement','summary','research_hypothesis']
 class TextTask(Contract):
     task: Task
     text: str = Field(min_length=1, max_length=100000)
@@ -21,7 +21,11 @@ class Finding(Contract):
     quote: str = Field(min_length=1,max_length=2000)
     confidence: float = Field(ge=0,le=1)
 
+from backend.intelligence.semantic import SemanticResearch
+
 class Extraction(Contract):
+    hypothesis: dict | None = None
+    research: SemanticResearch | None = None
     summary: str = Field(max_length=6000)
     findings: list[Finding] = Field(default_factory=list,max_length=30)
     uncertainty: str = Field(max_length=2000)
@@ -69,7 +73,9 @@ class OpenAILLMProvider(LocalLLMProvider):
         super().__init__('https://api.openai.com/v1',model,api_key,transport)
     async def complete(self,system,text,max_tokens):
         payload={'model':self.model,'store':False,'messages':[{'role':'system','content':system},{'role':'user','content':text}],
-                 'max_completion_tokens':max_tokens,'response_format':{'type':'json_object'}}
+                 'max_completion_tokens':max_tokens,'response_format':{'type':'json_object'},'service_tier':'default'}
+        if self.model.startswith(('gpt-5.6-', 'gpt-6-', 'gpt-6.1-')):
+            payload['reasoning_effort']='low'
         return await self._request(payload,{'Authorization':'Bearer '+self.api_key})
 
 class HybridLLMProvider(LLMProvider):
@@ -84,11 +90,15 @@ class HybridLLMProvider(LLMProvider):
         # Explicit default. Failures/quality never trigger escalation.
         return await self.local.complete(system,text,max_tokens)
 
+
+
 def provider_for(settings:AISettings, credentials:dict, task:TextTask, transport=None)->LLMProvider:
-    local=LocalLLMProvider(settings.local_base_url,settings.local_model,credentials.get('LOCAL_LLM_API_KEY',''),transport)
-    remote=OpenAILLMProvider(settings.openai_model,credentials.get('OPENAI_API_KEY',''),transport)
     if settings.provider=='off': return DisabledLLMProvider()
+    local=LocalLLMProvider(settings.local_base_url,settings.local_model,credentials.get('LOCAL_LLM_API_KEY',''),transport)
     if settings.provider=='local': return local
+    def cloud(model):
+        return OpenAILLMProvider(model,credentials.get('OPENAI_API_KEY',''),transport)
+    remote=cloud(settings.openai_model)
     if settings.provider=='openai': return remote
-    escalation=OpenAILLMProvider(settings.escalation_model,credentials.get('OPENAI_API_KEY',''),transport)
+    escalation=cloud(settings.escalation_model)
     return HybridLLMProvider(local,escalation,settings).route(task)

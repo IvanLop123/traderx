@@ -76,7 +76,8 @@ def trader_metrics(trades,latency_bps=5,fee_bps=5,slippage_bps=5):
     notionals=np.array([abs(float(t.get('notional',float(t.get('px',0))*float(t.get('sz',0))))) for t in trades])
     copy_pnl=pnl-notionals*(latency_bps+fee_bps+slippage_bps)/1e4
     cumulative=np.r_[0,np.cumsum(pnl)]; drawdown=cumulative-np.maximum.accumulate(cumulative)
-    return {'trade_count':n,'realized_pnl':float(pnl.sum()),'win_rate':float((pnl>0).mean()),'expectancy':float(pnl.mean()),
+    from backend.intelligence.traders import trade_diagnostics
+    return {**trade_diagnostics(trades),'trade_count':n,'realized_pnl':float(pnl.sum()),'win_rate':float((pnl>0).mean()),'expectancy':float(pnl.mean()),
             'profit_factor':float(wins.sum()/-losses.sum()) if len(losses) else None,'max_drawdown_dollars':float(drawdown.min()),
             'largest_win_share':float(wins.max()/wins.sum()) if len(wins) else None,'copy_pnl_after_costs':float(copy_pnl.sum()),
             'copyability_score':float(np.clip(copy_pnl.sum()/pnl.sum(),0,1)) if pnl.sum()>0 else 0,
@@ -84,13 +85,5 @@ def trader_metrics(trades,latency_bps=5,fee_bps=5,slippage_bps=5):
                         'Copyability is a cost sensitivity estimate, not measured latency replay.']}
 
 def social_metrics(posts):
-    n=len(posts)
-    if not n:return {'status':'NO_POSTS'}
-    authors=pd.Series([p.get('author_id','unknown') for p in posts]).value_counts(normalize=True)
-    text=[p.get('text','').lower() for p in posts]
-    bullish=sum(any(w in t.split() for w in ('bullish','buy','growth')) for t in text)
-    bearish=sum(any(w in t.split() for w in ('bearish','sell','decline')) for t in text)
-    return {'mentions':n,'unique_authors':len(authors),'author_concentration':float((authors**2).sum()),
-            'bullish_keyword_fraction':bullish/n,'bearish_keyword_fraction':bearish/n,
-            'lexical_disagreement':2*min(bullish,bearish)/n,'engagement':sum(sum(p.get('public_metrics',{}).values()) for p in posts),
-            'warning':'Lexical counts, not semantic inference or a bot verdict.'}
+    from backend.intelligence.social import analyze_posts
+    return analyze_posts(posts)

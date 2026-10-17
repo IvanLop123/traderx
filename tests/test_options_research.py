@@ -44,13 +44,3 @@ def test_old_chains_not_current_features_and_idempotent(db):
     r=derive_options(db,rid)
     assert r['feature_ids']==[] and r['evidence_ids']==[rid]
     assert derive_options(db,rid)==r and len(db.records('options_research'))==1
-
-async def test_provider_date_routing_and_automatic_local_analysis(db):
-    def handler(req):
-        assert req.url.params['date']=='2025-01-02'
-        assert req.url.params['function']=='HISTORICAL_OPTIONS'
-        return httpx.Response(200,json={'data':[contract(),contract('put')]})
-    p=MarketProviders(db,{'ALPHA_VANTAGE_API_KEY':'fixture'},httpx.MockTransport(handler))
-    await p.alpha('options','TEST',observation_date='2025-01-02')
-    assert len(db.records('options_research'))==1
-    assert 'fixture' not in str(db.records('raw'))

@@ -1,131 +1,82 @@
-# TraderX
+# TraderX — Multi-asset quantitative research and trading platform
 
-Local quantitative research and a paper-trading simulator, with optional text AI.
-This is the original permanent repository at `/Users/ivanlopez/Desktop/TraderX`.
-Phase 0 checks and private configuration have been preserved. Nothing was pushed.
+TraderX v1.0 is a local quantitative research platform for US equities, ETFs and crypto, with sourced options snapshot analytics and realistic paper execution. Its 502-instrument research universe, independent strategy families, cost-aware ensemble and prospective evaluation ledgers make each decision inspectable. **Real-money trading is not supported.**
 
-## Open the app
+## Governed Autonomous Alpha Research Engine
 
-Double-click `TraderX.command`, or run:
+A constrained research director turns new observations into preregistered hypotheses, bounded chronological experiments and recorded rejections or challengers. It works with deterministic templates; optional local/cloud language models propose narrative hypotheses only. Production recommendations and risk controls are never rewritten by the researcher.
 
-```sh
-cd /Users/ivanlopez/Desktop/TraderX
-./TraderX.command
-```
+**Observe → Hypothesize → Preregister → Experiment → Reject / Challenger → Forward Validate → Qualify**
 
-- Dashboard: http://localhost:3000
-- Backend health: http://localhost:8000/api/v1/health
-- Interactive API docs: http://localhost:8000/docs
+Research → Autonomous Research exposes lineage, novelty, multiple-testing accounting, compute/storage budgets and pause controls. Defaults are paused and cloud-off. Successful backtests cannot promote themselves: independent forward/benchmark qualification and explicit reviewed model registration remain required. The automatic interpreter starts with bounded Ridge/logistic models; richer model/feature implementations require review. [Architecture, schema, limits and use](docs/AUTONOMOUS_RESEARCH.md).
 
-The launcher builds the production UI when sources change. `dev.command` is also
-available for development with automatic frontend reloads.
+## Research with explicit limits
 
-Keep the launch window open. Ctrl-C stops only processes that launcher started.
-The local default stores data in `data/traderx.db` (SQLite). PostgreSQL is supported
-through `DATABASE_URL`; all migrations and a separate PostgreSQL integration test
-were exercised. Redis publishes updates when available; database jobs survive its
-absence. Backend and frontend bind only to loopback. This is a single-user local
-app, not an authenticated public deployment.
+- Point-in-time feature availability, publication/vintage checks and frozen model/data identities.
+- Configurable liquidity, volume, price, spread and data-quality eligibility. Retrospective universe membership and incomplete delisting returns remain disclosed limitations.
+- Cross-sectional relative-return and ranking models alongside classical linear/tree models; bounded CNN/TCN, GRU and transformer challengers remain research experiments.
+- Chronological splits, purged holding windows, walk-forward evaluation, calibration, benchmarks, multiple-testing controls and transaction-cost sensitivity.
+- Independent family grouping → ensemble → uncertainty → costs/liquidity → portfolio risk → BUY / SELL / HOLD / NO TRADE / INSUFFICIENT EVIDENCE.
+- Separate manual paper, Experimental Shadow, scientific forward-study and qualified Model Paper ledgers. Staying in cash is valid.
+- Fresh bid/ask checks, delayed execution, spread, slippage, fees, depth participation, partial/no fills and exchange sessions. A historical close is never an executable quote.
+- Immutable research provenance and forward evidence quarantined from training; aged observations require explicit controlled release.
 
-## What works
+**Negative findings are part of the product.** Bounded deep challengers did not consistently outperform simpler baselines. The tested relative-return strategies did not establish independent after-cost alpha. No current model is qualified for automatic Model Paper allocation. Credentials and more runtime do not guarantee eventual qualification or profitability. See [research findings](docs/ALPHA_RESEARCH_REPORT.md), [ensemble comparisons](docs/ENSEMBLE_RESEARCH_REPORT.md) and [methods](docs/QUANT_RESEARCH_METHODS.md).
 
-- Real public Coinbase spot quotes and completed daily candles; Hyperliquid
-  perpetual context/public wallet reads; Kalshi public demo markets.
-- Read adapters for credentialed Alpaca history, Alpha Vantage news/transcripts/
-  options, SEC filing metadata and documents, FRED vintage observations, EIA
-  electricity and explicitly enabled X access. Missing accounts remain visible.
-- Raw response provenance, normalized events, durable bars, features, signals,
-  documents, text jobs, research results, model versions and execution records.
-- Local returns, volume, volatility, VWAP, ATR, RSI, MACD, regime features;
-  deterministic Form 4/13F parsing, narrative keyword evidence, thematic mentions,
-  trader metrics, European option Greeks, parity and probability research utilities.
-- Source-backed transcript period comparisons, observed insider clusters and
-  amendment gates, same-quarter institutional holdings comparisons, historical
-  options liquidity/IV/skew summaries, and expiring evidence features.
-- Lagged momentum simulation with next-bar execution and costs; chronological
-  ridge/logistic/volatility baselines; validation calibration; purged holdout;
-  fixed strategy comparison, walk-forward checks, cost stress and benchmark gates;
-  portable saved coefficients; point-in-time joins for optional numeric evidence.
-- Internal paper cash/positions/fees, persisted risk approvals, duplicate guards,
-  stale-feed checks, concentration limits and a kill switch. Live execution is
-  unavailable. There is no broker order-submission route.
-- Next.js dashboard, scanner, asset detail, evidence drawer, intelligence views,
-  research controls, portfolio, orders, risk, health, AI settings and explicit chat.
+## Run the existing desktop installation
 
-This is a working research baseline, **not the entire requested main build**.
-Read [build coverage and remaining engineering](docs/BUILD_STATUS.md) before using
-any subsystem as if it were fully validated.
+Double-click `TraderX.command`, keep its Terminal window open, then visit [localhost:3000](http://localhost:3000). Ctrl-C stops the services started by that launcher. Existing credentials stay in your local `.env`; do not replace it with the template.
 
-## Optional AI
+## Fresh installation
 
-No OpenAI key, SDK or model server is needed to start or use quantitative modules.
-`LLM_PROVIDER=off` is the safe default. Automated analysis and cloud escalation
-are off. In Settings choose AI Off, Local AI, OpenAI or Hybrid. UI choices persist
-in the database while the environment is unchanged. Deliberate AI configuration
-changes in `.env` take effect on restart; credentials remain in `.env`.
-
-For LM Studio, load a compatible text model, start its OpenAI-compatible server
-on port 1234, then enter the exact model identifier in Settings. Local keys are
-optional. No model is downloaded or trained by TraderX. A later fine-tuned model
-can use the same contract and a new model identifier or prompt revision.
-
-OpenAI defaults: $1/day, $15/month, 10 requests/hour, 1,200 output tokens/request.
-Unknown model pricing blocks cloud calls. Local calls cost $0 in external API fees.
-Requests with uncertain outcomes keep conservative reservations and are not
-retried automatically. See [AI architecture](docs/AI_ARCHITECTURE.md).
-
-## Installation and verification
-
-The existing Python 3.12 virtual environment is retained. A fresh app-only setup:
+Use Python 3.12 and a current Node.js LTS with npm. From the repository root:
 
 ```sh
 python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements-app.txt
-npm ci --prefix frontend --cache data/npm-cache
-.venv/bin/python -m alembic upgrade head
-./TraderX.command
+.venv/bin/python -m pip install -r requirements.lock.txt
+npm ci --prefix frontend
+cp .env.example .env
+mkdir -p secrets data
+chmod 700 secrets
+chmod 600 .env
+.venv/bin/python scripts/dev.py --production
 ```
 
-For the complete existing Phase 0 environment use `requirements.lock.txt`.
-`requirements-openai.txt` is only needed for the optional legacy SDK smoke test;
-the application itself uses HTTPX. Never replace your existing `.env` with the
-example. New safe defaults are read from `.env.example` when absent locally.
+The lock contains the core application and statistical research dependencies. The optional bounded neural lab additionally requires `pip install -r requirements-research.txt`; ordinary startup does not import PyTorch. Optional Redis failure falls back to durable database jobs. SQLite is the default; PostgreSQL is supported and migration-tested.
+
+Without credentials the application starts, but it cannot invent market history or provider entitlements. Public crypto data can be collected while configured equity/research feeds remain unavailable. Fill only the providers you intend to use in `.env`, then restart. See [START_HERE](START_HERE.md).
+
+## Daily workflow
+
+Overview → Scanner → asset → TraderX View → Paper Trade → preview → **PLACE PAPER ORDER** → Portfolio → add, trim or exit → Orders / trade history. Notes are optional; evidence is captured automatically. Quotes and displayed depth may prevent fills. There is no Live Trade button.
+
+Primary pages: Overview, Scanner, Assets, Portfolio, Models, Research, System and Settings. Advanced diagnostics stay under Research. System shows provider and worker health; Settings controls the paper account and optional text extraction.
+
+## Optional text extraction
+
+Local, OpenAI, hybrid and off modes share one provider interface. The default is off. No model receives price ticks, indicators, risk calculations or portfolio accounting. Relevant unstructured documents are filtered, cached by content/prompt/model identity and batched where appropriate. Cloud extraction has persistent usage accounting and conservative dollar/rate limits. Budget exhaustion pauses extraction only. No subscription sign-in or conversational product is included in v1.
+
+## Reproducibility and verification
 
 ```sh
-./test.command                       # running app needed for frontend HTTP tests
-./check_environment.command          # original environment/security check
-./test_apis.command                  # original free, read-only provider checks
-npm run build --prefix frontend       # production build/type validation
+.venv/bin/python -m alembic upgrade head
+.venv/bin/python -m pytest -q
+npm run build --prefix frontend
+# With the app running:
+npm test --prefix frontend
+.venv/bin/python -B scripts/api_setup/check_repository.py --history
 ```
 
-The browser workflows were also tested manually in a browser. Tests use
-artificial fixtures only in isolated test databases. Production pages show real
-observations or explicit empty/unavailable states.
+Research runners live in `scripts/research/`. They use authorized local history and save immutable artifacts outside Git; large model runs are explicit, never startup work. See [architecture](docs/ARCHITECTURE.md), [validation and paper assumptions](docs/UNIVERSE_AND_FORWARD_STUDIES.md), and [v1 audit](docs/V1_FINAL_REPORT.md).
 
-## Docker / PostgreSQL
+## Repository safety
 
-Compose defines PostgreSQL, Redis, backend and frontend. Set a URL-safe local
-`TRADERX_DATABASE_PASSWORD` in your shell, then `docker compose up --build`.
-No database/Redis port is published; UI/backend ports bind to loopback. Docker was
-not installed on the development Mac, so Compose execution is not verified.
-Native PostgreSQL migrations and transaction tests passed independently.
+Git contains source, lightweight documentation, templates and configuration only. Credentials, `.env`, private keys, datasets, databases, accounts, logs, model binaries, checkpoints, caches and installed dependencies are ignored. Local hooks run the credential audit before commits/pushes. Do not publish provider data or assume API access grants redistribution rights.
 
-For an existing PostgreSQL instance set `DATABASE_URL` in `.env` to your local
-SQLAlchemy `postgresql+psycopg://...` URL and run migrations. Switching databases
-does not automatically copy SQLite data; back up and migrate explicitly.
+## Future work
 
-## Documentation
+Futures, a chatbot, richer options history and additional alternative datasets are postponed. They are not supported v1 product features.
 
-- [Build status / acceptance](docs/BUILD_STATUS.md)
-- [Architecture and storage](docs/ARCHITECTURE.md)
-- [AI providers, budgets and cache](docs/AI_ARCHITECTURE.md)
-- [Research, models and backtesting](docs/RESEARCH.md)
-- [Algorithm review and primary research sources](docs/ALGORITHM_REVIEW.md)
-- [GitHub preparation and secret exclusions](docs/GITHUB_SAFETY.md)
-- [Signals and validation status](docs/SIGNAL_CATALOG.md)
-- [Document, institutional and options research](docs/EVIDENCE_RESEARCH.md)
-- [Risk, execution and security](docs/RISK_AND_SECURITY.md)
-- [Remaining setup / credentials](docs/USER_SETUP.md)
-- [Provider documentation references](docs/PROVIDER_IMPLEMENTATION.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Original API setup](docs/API_SETUP.md), [Phase 0 readiness](docs/PRE_BUILD_READINESS.md)
+### News evidence
+
+Continuous Alpaca news collection uses existing account access, with deterministic relevance filtering, deduplication, event classification and immediate affected-asset recommendation refresh. News has no validated predictive weight yet; it is forward-collected evidence with a conservative adverse-event entry guard. [Access, latency and limitations](docs/NEWS_INTELLIGENCE.md) are explicit in System. No chatbot or LLM request is involved.

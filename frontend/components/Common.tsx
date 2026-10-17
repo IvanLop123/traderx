@@ -105,13 +105,13 @@ export function Plot({
         >
           <defs>
             <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#4bcea6" stopOpacity={0.22} />
-              <stop offset="95%" stopColor="#4bcea6" stopOpacity={0} />
+              <stop offset="0%" stopColor="#b48768" stopOpacity={0.22} />
+              <stop offset="95%" stopColor="#b48768" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid
             vertical={false}
-            stroke="#263338"
+            stroke="#44342b"
             strokeDasharray="3 5"
           />
           <XAxis
@@ -125,30 +125,30 @@ export function Plot({
             }
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#819397", fontSize: 10 }}
+            tick={{ fill: "#b9aaa0", fontSize: 10 }}
           />
           <YAxis
             domain={["auto", "auto"]}
             width={65}
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#819397", fontSize: 10 }}
+            tick={{ fill: "#b9aaa0", fontSize: 10 }}
             tickFormatter={(v) => number(v, 0)}
           />
           <Tooltip
             labelFormatter={(v) => date(String(v))}
             formatter={(v) => money(Number(v))}
             contentStyle={{
-              background: "#162428",
-              border: "1px solid #35464c",
+              background: "#211915",
+              border: "1px solid #634b3d",
               borderRadius: 8,
-              color: "#e5efed",
+              color: "#f2eae4",
             }}
           />
           <Area
             type="monotone"
             dataKey={value}
-            stroke="#4bcea6"
+            stroke="#b48768"
             fill="url(#fade)"
             strokeWidth={2}
             isAnimationActive={false}
@@ -157,7 +157,7 @@ export function Plot({
             <Area
               type="monotone"
               dataKey={second}
-              stroke="#8297c9"
+              stroke="#a8adb9"
               fill="none"
               strokeWidth={1.5}
               isAnimationActive={false}

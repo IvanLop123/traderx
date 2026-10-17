@@ -22,7 +22,7 @@ class VisibleText(HTMLParser):
         if not self.hidden:self.parts.append(text)
 
 class ScheduledIngestion:
-    REQUIRED={'alpaca':['ALPACA_API_KEY','ALPACA_API_SECRET'],'alpha_vantage':['ALPHA_VANTAGE_API_KEY'],
+    REQUIRED={'alpaca':['ALPACA_API_KEY','ALPACA_API_SECRET'],
               'sec':['SEC_USER_AGENT'],'fred':['FRED_API_KEY'],'eia':['EIA_API_KEY']}
     def __init__(self,db,providers,paper,stop,settings=None):
         self.db=db;self.providers=providers;self.paper=paper;self.stop=stop
@@ -41,7 +41,7 @@ class ScheduledIngestion:
                 self.db.set_setting('schedule_'+name,{'last_attempt':now().isoformat(),'next_run':(now()+timedelta(seconds=interval)).isoformat(),'status':'RUNNING'})
                 try:
                     await self.cycle(name);status='WORKING'
-                except Exception:status='DEFERRED'
+                except Exception as exc:status=getattr(exc,'status','DEFERRED')
                 self.db.set_setting('schedule_'+name,{**self.db.setting('schedule_'+name),'status':status})
             try:await asyncio.wait_for(self.stop.wait(),timeout=min(interval,60))
             except asyncio.TimeoutError:pass
@@ -49,8 +49,12 @@ class ScheduledIngestion:
         p=self.providers;c=self.settings
         if name=='alpaca':
             quotes={}
+            warnings=[]
             for symbol in c['equities'][:20]:
-                quotes[symbol]=await p.alpaca_quote(symbol)
+                try:quotes[symbol]=await p.alpaca_quote(symbol)
+                except Exception as exc:
+                    if getattr(exc,'status',None) not in ('MISSING_DATA','DEGRADED'):raise
+                    warnings.append(getattr(exc,'detail','Quote unavailable'))
                 last=self.db.setting('stock_history_'+symbol,{})
                 if last.get('date')!=now().date().isoformat():
                     await p.alpaca_bars(symbol,(now()-timedelta(days=c['lookback_days'])).date().isoformat(),now().date().isoformat())
@@ -60,9 +64,9 @@ class ScheduledIngestion:
                         persist_market_signals(self.db,symbol,f,rows)
                     self.db.set_setting('stock_history_'+symbol,{'date':now().date().isoformat()})
             self.paper.mark(quotes)
-        elif name=='alpha_vantage':
-            # One multi-symbol news request per cycle. Premium transcripts/options remain on demand.
-            await p.alpha('news',','.join(c['equities'][:10]))
+            if warnings:
+                saved=self.db.setting('provider_alpaca',{})
+                self.db.set_setting('provider_alpaca',{**saved,'status':'WORKING_READ_ONLY','last_error':'; '.join(warnings),'quote_status':'MISSING_DATA','history_status':'AVAILABLE'})
         elif name=='sec':
             for symbol,cik in list(c['sec_ciks'].items())[:20]:
                 filings=await p.sec(cik)
@@ -82,5 +86,16 @@ class ScheduledIngestion:
                         if section:store_document(self.db,text=section,kind=kind,title=f"{symbol} {filing['form']} {filing['filingDate']} section {i+1}",source_reference=source+f'#section-{i+1}',symbol=symbol,published_at=published,provider='sec',period_end=filing.get('reportDate') or None)
                     self.db.set_setting(key,{'processed_at':now().isoformat(),'sections':len(sections),'characters':len(text),'truncated':len(text)>120000 and kind!='form4'})
         elif name=='fred':
-            for series in c['fred_series'][:10]:await p.fred(series,now().date().isoformat())
+            from zoneinfo import ZoneInfo
+            provider_date=now().astimezone(ZoneInfo('America/Chicago')).date().isoformat()
+            for series in c['fred_series'][:10]:await p.fred(series,provider_date)
+            from backend.research.features import MACRO
+            for series in MACRO:
+                saved=self.db.setting('macro_initial_'+series,{})
+                if saved.get('date')!=now().date().isoformat():
+                    try:
+                        await p.fred_initial(series)
+                        self.db.set_setting('macro_initial_'+series,{'date':now().date().isoformat(),'status':'WORKING'})
+                    except Exception as exc:
+                        self.db.set_setting('macro_initial_'+series,{'date':now().date().isoformat(),'status':getattr(exc,'status','UNAVAILABLE')})
         elif name=='eia':await p.eia()

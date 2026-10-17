@@ -93,7 +93,7 @@ def test_provider_failure_no_ai_crash(db):
     with TestClient(app) as client:
         assert client.get('/api/v1/health').status_code==200
         h={'X-TraderX-Client':'local-ui'}
-        assert client.post('/api/v1/chat',json={'message':'Explain earnings'},headers=h).json()['status']=='DISABLED'
+        assert client.post('/api/v1/chat',json={'message':'Explain earnings'},headers=h).status_code==404
         assert client.get('/api/v1/portfolio').json()['cash']==100000
         assert client.post('/api/v1/risk/halt',json={'halted':False}).status_code==403
         assert client.post('/api/v1/risk/halt',json={'halted':False},headers={**h,'Origin':'https://attacker.example'}).status_code==403
@@ -195,3 +195,55 @@ def test_ui_exit_path_requires_risk_and_closes_only_internal_paper(db):
         assert order.json()['status']=='filled'
         assert client.get('/api/v1/portfolio').json()['positions']=={}
         assert client.get('/api/v1/settings/ai').json()['usage']['calls']==0
+
+
+def test_forecaster_selection_ignores_changed_holdout(bars):
+    from backend.research.governance import compare_forecasters
+    a=compare_forecasters(bars,1)
+    revised=[dict(b) for b in bars]
+    for row in revised[-30:]:row['close']*=1.2;row['high']*=1.2
+    b=compare_forecasters(revised,1)
+    assert a['selected_on_validation_only']==b['selected_on_validation_only']
+    assert [r['validation_mse'] for r in a['model_comparison']]==[r['validation_mse'] for r in b['model_comparison']]
+    assert a['splits']['training']['end']<a['splits']['validation']['start']<a['splits']['holdout']['start']
+
+
+def test_portfolio_replay_is_causal_and_preserves_inputs(db,bars):
+    from backend.research.replay import PortfolioReplayRequest,replay_portfolio
+    for row in bars:db.put('bar',row,'BTC-USD')
+    a=replay_portfolio(db,PortfolioReplayRequest(symbols=['BTC-USD']))
+    assert a['fills'] and db.get(a['input_record_id'])['kind']=='replay_input'
+    assert all(f['decided_at']<f['timestamp'] for f in a['fills'])
+    assert a['cash']>=0
+    with pytest.raises(ValueError,match='No executable history'):replay_portfolio(db,PortfolioReplayRequest(symbols=['BTC-USD'],strict_observed=True))
+
+
+def test_model_registry_requires_prospective_outcomes_and_never_backfills(db,bars,monkeypatch):
+    from backend.research.registry import ModelRegistry
+    import backend.research.registry as module
+    model=train_fusion(bars,1);mid=db.put('model',model,'BTC-USD')
+    for b in bars:db.put('bar',b,'BTC-USD')
+    registry=ModelRegistry(db);watch=registry.start(mid)
+    with pytest.raises(ValueError,match='gates'):registry.promote(mid)
+    registry.refresh();assert not db.records('shadow_prediction')  # Existing backtests do not become prospective evidence.
+    clock=now()+timedelta(days=1)
+    first={**bars[-1],'timestamp':(clock-timedelta(days=1)).isoformat(),'available_at':clock.isoformat(),'observed_at':clock.isoformat()}
+    db.put('bar',first,'BTC-USD');monkeypatch.setattr(module,'now',lambda:clock+timedelta(seconds=1))
+    registry.refresh();assert len(db.records('shadow_prediction'))==1 and registry.metrics(mid)['outcomes']==0
+    later=clock+timedelta(days=1)
+    target={**first,'timestamp':clock.isoformat(),'available_at':later.isoformat(),'observed_at':later.isoformat(),'close':first['close']*1.01,'high':first['high']*1.02}
+    db.put('bar',target,'BTC-USD');monkeypatch.setattr(module,'now',lambda:later+timedelta(seconds=1))
+    registry.refresh();metrics=registry.metrics(mid)
+    assert metrics['outcomes']==1 and not registry.eligible(mid)
+    registry.refresh();assert registry.metrics(mid)['outcomes']==1
+    registry.retire(mid);assert registry.status()[0]['lifecycle']['state']=='retired'
+
+
+def test_model_promotion_revokes_eligibility_when_forward_benchmarks_fail(db,bars):
+    from backend.research.registry import ModelRegistry
+    model=train_fusion(bars,1);model['research_candidate_eligible']=True
+    mid=db.put('model',model,'BTC-USD');registry=ModelRegistry(db);registry.start(mid)
+    for i in range(30):db.put('shadow_outcome',{'model_id':mid,'actual_return':.01,'expected_return':.01,'probability_positive':.9},'BTC-USD')
+    assert registry.promote(mid)['state']=='paper_candidate' and registry.eligible(mid)
+    db.put('shadow_outcome',{'model_id':mid,'actual_return':-.5,'expected_return':.5,'probability_positive':.99},'BTC-USD')
+    assert not registry.eligible(mid)

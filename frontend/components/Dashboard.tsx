@@ -26,13 +26,23 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Badge, Empty, JsonView } from "./Common";
-import { Overview, Scanner, Asset } from "./MarketViews";
 import { AISettingsView } from "./AISettingsView";
 import { Providers } from "./Providers";
 import { Research } from "./Research";
-import { Portfolio, Risk, Orders } from "./PortfolioViews";
+import {AutonomousResearch} from "./AutonomousResearch";
+import { Risk } from "./PortfolioViews";
 import { Options, Intelligence } from "./IntelligenceViews";
-import { Chat } from "./Chat";
+import { NewsEvents } from "./NewsEvents";
+import { SystemResearch } from "./SystemResearch";
+import { DataCoverage } from "./DataCoverage";
+import {DecisionDiagnostics,ForwardEvidence} from "./Qualification";
+import { ForwardStudies } from "./ForwardStudies";
+import {GlobalAssetSearch,AssetHistory,PersonalOrders,PaperSettings} from "./PaperProduct";
+import {ModelPortfolioView,StrategyRegistry} from "./ModelPortfolio";
+import {CockpitOverview,CockpitScanner,CockpitAsset,CockpitPortfolio,TradeIdeas} from "./DecisionCockpit";
+import {MarketStructure} from "./MarketStructure";
+import {AlphaResearch} from "./AlphaResearch";
+import {AdvancedResearch,ShadowPortfolioView} from "./AdvancedResearch";
 type Data = Record<string, any>;
 const groups = [
   {
@@ -51,9 +61,7 @@ const groups = [
       ["earnings", "Earnings", FileText],
       ["institutions", "Institutions", Boxes],
       ["traders", "Public traders", Globe2],
-      ["social", "Social & viral", MessageSquare],
       ["options", "Options", Layers3],
-      ["prediction-markets", "Prediction markets", BarChart3],
       ["crypto", "Crypto", Zap],
       ["themes", "Themes & relationships", Network],
       ["macro", "Macro & energy", Globe2],
@@ -63,6 +71,10 @@ const groups = [
     name: "RESEARCH",
     items: [
       ["research", "Research lab", FlaskConical],
+      ["autonomous-research", "Autonomous Research", FlaskConical],
+      ["advanced-research", "Advanced Research", FlaskConical],
+      ["alpha-library", "Alpha library", FlaskConical],
+      ["market-structure", "Market structure", FlaskConical],
       ["experiments", "Experiments", BookOpen],
       ["backtests", "Backtests", BarChart3],
       ["models", "Models", Boxes],
@@ -87,18 +99,18 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [inspect, setInspect] = useState<Data | null>(null);
-  const [chat, setChat] = useState(false);
   const refresh = useCallback(async () => {
     try {
-      setOverview(await api("/overview"));
+      if (["settings","providers","system","risk"].includes(page)) setOverview(await api("/overview"));
+      else setOverview({providers:await api("/providers")});
       setError("");
     } catch (e) {
       setError((e as Error).message);
     }
-  }, []);
+  }, [page]);
   useEffect(() => {
     refresh();
-    const timer = setInterval(refresh, 15000);
+    const timer = setInterval(refresh, 60000);
     return () => clearInterval(timer);
   }, [refresh]);
   const act = async (fn: () => Promise<any>, success = "Saved") => {
@@ -120,7 +132,11 @@ export default function Dashboard() {
     page === "asset"
       ? assetSymbol
       : groups.flatMap((g) => g.items).find((i) => i[0] === page)?.[1] ||
-        "Overview";
+        ({"shadow-portfolio":"Experimental Shadow Portfolio","alpha-library":"Alpha library & allocation","advanced-research":"Advanced Research","trade-ideas":"My Trade Ideas",watchlist:"Watchlist",assets:"Assets",system:"System",coverage:"Data coverage",workers:"Workers","forward-studies":"Forward studies","model-portfolio":"Model Paper Portfolio","forward-evidence":"Forward Evidence","decision-diagnostics":"Decision diagnostics"}[page]||"Overview");
+  const researchPages=['research','autonomous-research','alpha-library','advanced-research','market-structure','backtests','experiments','strategies','insiders','institutions','earnings','macro','themes','traders','options'];
+  const section=researchPages.includes(page)?'research':['providers','coverage','workers'].includes(page)?'system':['portfolio','shadow-portfolio','orders','risk','forward-studies','model-portfolio','forward-evidence','decision-diagnostics'].includes(page)?'portfolio':['asset','assets','crypto','watchlist','trade-ideas'].includes(page)?'assets':page;
+  const primary=[['','Overview',LayoutDashboard],['scanner','Scanner',Search],['assets','Assets',BarChart3],['portfolio','Portfolio',Wallet],['models','Models',Boxes],['research','Research',FlaskConical],['system','System',Activity],['settings','Settings',Settings2]];
+  const subitems=section==='research'?researchPages.map(p=>[p,String(groups.flatMap(g=>g.items).find(i=>i[0]===p)?.[1]||p)]):section==='system'||page==='system'?[['providers','Provider health'],['coverage','Data coverage'],['workers','Workers']]:section==='portfolio'?[['shadow-portfolio','Experimental Shadow'],['model-portfolio','Qualified Model Paper'],['portfolio','My Manual Portfolio'],['forward-evidence','Forward Evidence'],['decision-diagnostics','Decision diagnostics'],['forward-studies','Scientific studies'],['orders','Orders'],['risk','Risk controls']]:section==='assets'?[['assets','Asset list'],['watchlist','Watchlist'],['trade-ideas','My Trade Ideas'],['crypto','Crypto context']]:[];
   const providers = overview?.providers || [];
   const healthy = providers.filter((p: Data) =>
     p.status.startsWith("WORKING"),
@@ -142,28 +158,7 @@ export default function Dashboard() {
           </div>
           <ChevronRight size={14} />
         </div>
-        <nav>
-          {groups.map((g) => (
-            <div key={g.name} className="nav-group">
-              <div className="nav-label">{g.name}</div>
-              {g.items.map(([path, label, Icon]) => {
-                const I = Icon as typeof Activity;
-                return (
-                  <Link
-                    key={String(path)}
-                    aria-label={String(label)}
-                    href={"/" + path}
-                    className={page === path ? "nav-item active" : "nav-item"}
-                  >
-                    <I size={16} />
-                    <span>{String(label)}</span>
-                    {path === "" && <span className="nav-dot" />}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
+        <nav aria-label="Primary navigation">{primary.map(([path,label,Icon])=>{const I=Icon as typeof Activity;return <Link key={String(path)} title={String(label)} aria-label={String(label)} href={'/'+path} className={section===path||(page==='system'&&path==='system')?'nav-item active':'nav-item'}><I size={18}/><span>{String(label)}</span></Link>})}</nav>
         <div className="sidebar-foot">
           <span className="status-dot" /> Deterministic engine
           <small>AI is optional. Your research stays running.</small>
@@ -174,21 +169,17 @@ export default function Dashboard() {
           <div className="breadcrumb">
             Workspace <ChevronRight size={12} /> <span>{String(title)}</span>
           </div>
+          <GlobalAssetSearch/>
           <div className="top-right">
             <Badge tone="green">
               <span className="status-dot" /> INTERNAL PAPER
             </Badge>
-            <button
-              className="icon-button"
-              aria-label="Open chatbot"
-              onClick={() => setChat(true)}
-            >
-              <MessageSquare size={18} />
-            </button>
+
             <span className="avatar small">IL</span>
           </div>
         </header>
         <main>
+          {subitems.length>0&&<nav className="subnav" aria-label="Section navigation">{subitems.map(([path,label])=><Link key={path} href={"/"+path} aria-current={page===path?"page":undefined}>{label}</Link>)}</nav>}
           <div className="page-heading">
             <div className="eyebrow">
               TRADERX / {page ? "WORKSPACE" : "MARKET INTELLIGENCE"}
@@ -242,51 +233,58 @@ export default function Dashboard() {
               </button>
             </div>
           )}
-          {!overview ? (
+          {!overview && ["settings","providers","system","risk"].includes(page) ? (
             <Empty title="Connecting to TraderX">
-              Start the backend at localhost:8000 to load your workspace.
+              Loading your saved workspace and current data. If this takes longer than a few seconds, open TraderX.command and retry.
             </Empty>
           ) : (
             <>
               {!page && (
-                <Overview
-                  data={overview}
-                  healthy={healthy}
-                  onInspect={setInspect}
-                />
+                <><CockpitOverview/><NewsEvents/></>
               )}
-              {page === "scanner" && <Scanner data={overview} />}
+              {page === "scanner" && <CockpitScanner/>}
+              {page === "assets" && <CockpitScanner/>}
+              {page === "advanced-research" && <AdvancedResearch/>}
+              {page === "alpha-library" && <AlphaResearch/>}
+              {page === "market-structure" && <MarketStructure/>}
+          {page === "shadow-portfolio" && <ShadowPortfolioView/>}
+          {page === "model-portfolio" && <ModelPortfolioView/>}
+              {page === "strategies" && <StrategyRegistry/>}
+              {page === "watchlist"&&<CockpitScanner watchOnly/>}
               {page === "asset" && (
-                <Asset symbol={assetSymbol} onInspect={setInspect} />
+                <><AssetHistory key={assetSymbol} symbol={assetSymbol}/><CockpitAsset key={assetSymbol+"-view"} symbol={assetSymbol}/><NewsEvents symbol={assetSymbol}/></>
               )}
               {page === "settings" && (
-                <AISettingsView data={overview.ai} act={act} />
+                <><PaperSettings/><AISettingsView data={overview?.ai} act={act} /></>
               )}
-              {page === "providers" && <Providers data={overview} act={act} />}
+              {["providers","system"].includes(page) && <Providers data={overview!} act={act} />}
+              {page === "workers"&&<SystemResearch/>}
+              {page === "coverage"&&<DataCoverage/>}
+              {page === "forward-studies"&&<ForwardStudies/>}
+              {page === "forward-evidence"&&<ForwardEvidence/>}
+              {page === "decision-diagnostics"&&<DecisionDiagnostics/>}
               {[
                 "research",
                 "experiments",
                 "backtests",
                 "models",
-                "strategies",
               ].includes(page) && (
                 <Research page={page} act={act} onInspect={setInspect} />
               )}
+              {page === "autonomous-research" && <AutonomousResearch/>}
               {page === "risk" && (
-                <Risk data={overview} act={act} onInspect={setInspect} />
+                <Risk data={overview!} act={act} onInspect={setInspect} />
               )}
-              {page === "portfolio" && <Portfolio data={overview} act={act} />}
-              {page === "orders" && <Orders act={act} onInspect={setInspect} />}
+              {page === "portfolio" && <CockpitPortfolio />}
+              {page === "orders" && <PersonalOrders />}{page === "trade-ideas"&&<TradeIdeas/>}
               {page === "options" && <Options act={act} />}
               {[
                 "earnings",
                 "insiders",
                 "institutions",
                 "themes",
-                "social",
                 "macro",
                 "crypto",
-                "prediction-markets",
                 "traders",
               ].includes(page) && (
                 <Intelligence page={page} act={act} onInspect={setInspect} />
@@ -343,12 +341,7 @@ export default function Dashboard() {
           </section>
         </div>
       )}
-      {chat && (
-        <Chat
-          onClose={() => setChat(false)}
-          provider={overview?.ai.current_provider || "off"}
-        />
-      )}
+
     </div>
   );
 }

@@ -9,8 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import Ridge, LogisticRegression
 from sklearn.metrics import mean_squared_error, brier_score_loss
 from backend.intelligence.quant import features, RESEARCH
-from backend.schemas.contracts import Prediction, AssetIdentifier, TradeCandidate, now
-from datetime import timedelta
+from backend.schemas.contracts import now
 
 FEATURES=['return_1','return_5','return_20','realized_volatility','volume_zscore','vwap_distance','rsi','bollinger_z']
 
@@ -161,15 +160,6 @@ def fdr(pvalues):
     p=np.asarray(pvalues); order=np.argsort(p); result=np.empty(len(p)); adjusted=p[order]*len(p)/np.arange(1,len(p)+1)
     result[order]=np.minimum.accumulate(adjusted[::-1])[::-1].clip(0,1); return result.tolist()
 
-def candidate_from_prediction(prediction:Prediction,quote,equity=100000):
-    costs=RESEARCH['estimated_round_trip_cost']; edge=prediction.expected_return-costs
-    if edge<=prediction.uncertainty or prediction.probability_positive<RESEARCH['candidate_probability_min']: return None
-    price=float(quote['price']); budget=equity*RESEARCH['candidate_fraction']
-    return TradeCandidate(asset=prediction.asset,prediction_id=prediction.id,direction='buy',horizon=prediction.horizon,
-        entry_price=price,quantity=budget/price,expected_edge=edge,expected_costs=costs,expected_downside=prediction.downside,
-        confidence=prediction.probability_positive,evidence_ids=prediction.evidence_ids,expires_at=now()+timedelta(seconds=RESEARCH['candidate_ttl_seconds']),liquidity=quote)
-
-
 def infer_registered(model_record,bars,feature_records=None):
     """Portable JSON coefficients; never deserialize arbitrary pickle code."""
     from scipy.special import expit
@@ -189,4 +179,4 @@ def infer_registered(model_record,bars,feature_records=None):
     if artifact['calibration']:score=score*artifact['calibration']['coef']+artifact['calibration']['intercept']
     variance=variance-expected**2 if artifact.get('format_version',1)>=2 else variance
     return {'expected_return':expected,'probability_positive':float(expit(score)),'expected_volatility':float(np.sqrt(max(0,variance))),
-            'downside':artifact['downside'],'uncertainty':artifact['uncertainty'],'contributions':contributions}
+            'downside':artifact['downside'],'uncertainty':artifact['uncertainty'],'contributions':contributions,'feature_values':{k:float(v) for k,v in latest.items()}}

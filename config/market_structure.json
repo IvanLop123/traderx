@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "symbols": ["AAPL", "SPY", "BTC-USD"],
+  "intervals": [60, 300, 900, 3600],
+  "lookback_days": 7,
+  "refresh_hours": 24,
+  "max_requests_per_cycle": 80,
+  "max_saved_bytes": 250000000,
+  "options_symbols": ["AAPL"],
+  "options_feed": "indicative"
+}

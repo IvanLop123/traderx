@@ -1,10 +1,13 @@
 "use client";
+import {DocumentComparisons} from "./DocumentComparisons";
 import { useEffect, useState, useCallback } from "react";
 import { ArrowUpRight as Arrow, BookOpen } from "lucide-react";
 import { api, money, number, pct } from "@/lib/api";
 import { Badge, Panel, JsonView, Records } from "./Common";
+import { ObservationMetrics } from "./ObservationMetrics";
+import { CopyReplay } from "./CopyReplay";
+import { SemanticResearch } from "./SemanticResearch";
 import { EvidenceResearch } from "./EvidenceResearch";
-import { OptionsResearch } from "./OptionsResearch";
 import { InstitutionalConsensus } from "./InstitutionalConsensus";
 type Data = Record<string, any>;
 export function Options({ act }: { act: any }) {
@@ -20,7 +23,6 @@ export function Options({ act }: { act: any }) {
   const [result, setResult] = useState<Data | null>(null);
   return (
     <>
-      <OptionsResearch />
       <Panel
         title="European options calculator"
         eyebrow="DETERMINISTIC PYTHON · NO AI"
@@ -80,9 +82,7 @@ export function Options({ act }: { act: any }) {
           </div>
         </Panel>
       )}
-      <Panel title="Options market evidence">
-        <DataRecords kind="options" />
-      </Panel>
+      <p className="panel-note">Current sourced option surfaces are in Research → Market structure → Options. These are snapshot analytics; options trading is not supported.</p>
     </>
   );
 }
@@ -125,10 +125,8 @@ export function Intelligence({
     insiders: "document",
     institutions: "document",
     themes: "theme",
-    social: "social",
     macro: "macro",
     crypto: "crypto",
-    "prediction-markets": "prediction_market",
     traders: "trader",
   };
   const kind = map[page];
@@ -164,16 +162,12 @@ export function Intelligence({
       "13F holdings are delayed. Filing availability must be preserved separately from quarter-end holdings dates.",
     themes:
       "Evidence-backed mentions across nuclear, robotics, AI infrastructure and power. Mentions do not prove supplier relationships.",
-    social:
-      "X is disabled by default. Authorized data can support attention, concentration and disagreement research.",
     macro:
       "FRED observations retain their vintage. EIA electricity data is available when configured.",
     crypto:
       "Public perpetual market observations. Funding and spot exposures remain distinct.",
     traders:
       "Import authorized observations or inspect a public Hyperliquid wallet. No automatic copying.",
-    "prediction-markets":
-      "Public Kalshi demo markets. Market-implied prices are observations; no fair probability is invented.",
   };
   return (
     <>
@@ -219,27 +213,6 @@ export function Intelligence({
                   ))}
               </tbody>
             </table>
-          </div>
-        </Panel>
-      ) : page === "prediction-markets" && rows.length ? (
-        <Panel title="Open demo markets">
-          <div className="market-cards">
-            {rows.slice(0, 20).map((r) => (
-              <button key={r.id} onClick={() => onInspect(r)}>
-                <Badge>DEMO MARKET</Badge>
-                <h3>{r.payload.title}</h3>
-                <div>
-                  <span>YES bid / ask</span>
-                  <strong>
-                    {r.payload.yes_bid_dollars ?? "—"} /{" "}
-                    {r.payload.yes_ask_dollars ?? "—"}
-                  </strong>
-                </div>
-                <small>
-                  Fair probability: not estimated · View rules & evidence →
-                </small>
-              </button>
-            ))}
           </div>
         </Panel>
       ) : (
@@ -375,6 +348,8 @@ export function Intelligence({
           </p>
         </Panel>
       )}
+      <ObservationMetrics page={page} rows={rows} onInspect={onInspect} />
+      {["earnings","themes"].includes(page) && <><SemanticResearch revision={rows} onInspect={onInspect} /><DocumentComparisons revision={rows} onInspect={onInspect} /></>}
       {page === "traders" && (
         <div className="two-col">
           <Panel title="Public wallet research">
@@ -425,6 +400,7 @@ export function Intelligence({
           </Panel>
         </div>
       )}
+      {page === "traders" && <CopyReplay act={act} onInspect={onInspect} />}
       {page === "macro" && (
         <Panel title="Electricity & energy">
           <DataRecords kind="energy" />

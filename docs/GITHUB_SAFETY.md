@@ -1,7 +1,8 @@
 # Before publishing to GitHub
 
-No repository push, publication or archive was performed. The repository has no
-existing commits or configured remote as of this review. No authoring-tool credit,
+No repository push, publication or archive was performed by this build. The renamed
+repository already contains an initial commit and a configured remote; both were
+preserved. Existing commit metadata was checked for authoring-tool markers. No authoring-tool credit,
 generator tag or co-author trailer was added. App page metadata identifies TraderX
 only. Required optional-provider names and third-party licenses remain intact.
 

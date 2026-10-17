@@ -51,7 +51,3 @@ The local source-built core Redis lives in ignored data/redis-stable/src; it doe
 not include Redis Search/JSON modules, which TraderX does not need. The launcher
 uses it when present. Docker Compose provides a reproducible Redis alternative.
 On this Mac Redis needs LC_ALL=C and --locale-collate C; the launcher supplies them.
-
-**Optional SDK missing:** the application requires no OpenAI SDK. The original
-OpenAI-specific Phase 0 test uses requirements-openai.txt only when enabled. The
-full existing provider environment is recorded in requirements.lock.txt.

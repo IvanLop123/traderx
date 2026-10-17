@@ -1,1 +1,39 @@
-{"checked_on":"2026-09-25","source":"https://developers.openai.com/api/docs/models/gpt-5.4-nano","usd_per_million_tokens":{"gpt-5.4-nano":{"input":0.20,"output":1.25},"gpt-5.4-nano-2026-03-17":{"input":0.20,"output":1.25}}}
+{
+  "checked_on": "2026-10-08",
+  "usd_per_million_tokens": {
+    "gpt-5.6-luna": {
+      "input": 0.25,
+      "output": 1.2,
+      "input_bound_limit": 272000
+    },
+    "gpt-5.4-nano": {
+      "input": 0.2,
+      "output": 1.25
+    },
+    "gpt-5.4-nano-2026-03-17": {
+      "input": 0.2,
+      "output": 1.25
+    },
+    "gpt-6-astra": {
+      "input": 12.5,
+      "output": 50,
+      "input_bound_limit": 272000
+    },
+    "gpt-6.1-sol": {
+      "input": 2.5,
+      "output": 10,
+      "input_bound_limit": 272000
+    },
+    "gpt-6-luna": {
+      "input": 0.125,
+      "output": 0.5,
+      "input_bound_limit": 272000
+    }
+  },
+  "sources": [
+    "https://developers.openai.com/api/docs/models/gpt-5.4-nano",
+    "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+    "https://developers.openai.com/api/docs/pricing"
+  ],
+  "note": "GPT-5.6 and GPT-6 estimates conservatively charge all input at the cache-write rate; actual invoices may be lower. Bounded app context stays below the long-context threshold. Standard service tier only."
+}

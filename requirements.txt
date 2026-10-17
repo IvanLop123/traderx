@@ -5,10 +5,5 @@ python-dotenv==1.2.3
 cryptography==50.0.1
 PyJWT==2.15.0
 
-# Provider SDKs retained for Phase 0; missing credentials are optional.
-# OpenAI SDK is optional: requirements-openai.txt
-alpaca-py==0.44.0
-gs-quant==2.1.17
-coinbase-advanced-py==1.8.4
 
 -r requirements-app.txt

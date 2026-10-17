@@ -18,9 +18,6 @@ SAFE_SETTINGS = {
     'ALPACA_TRADING_BASE_URL': 'https://paper-api.alpaca.markets',
     'ALPACA_DATA_BASE_URL': 'https://data.alpaca.markets',
     'ALPACA_DATA_FEED': 'iex',
-    'KALSHI_ENV': 'demo',
-    'KALSHI_BASE_URL': 'https://external-api.demo.kalshi.co/trade-api/v2',
-    'KALSHI_TRADING_ENABLED': 'false',
     'COINBASE_TRADING_ENABLED': 'false',
     'HYPERLIQUID_NETWORK': 'mainnet',
     'HYPERLIQUID_TRADING_ENABLED': 'false',
@@ -28,12 +25,9 @@ SAFE_SETTINGS = {
 KEY_GROUPS = {
     'OPENAI': ['OPENAI_API_KEY'],
     'ALPACA_PAPER': ['ALPACA_API_KEY', 'ALPACA_API_SECRET'],
-    'ALPHA_VANTAGE': ['ALPHA_VANTAGE_API_KEY'],
     'SEC_EDGAR': ['SEC_USER_AGENT'],
     'FRED': ['FRED_API_KEY'],
     'EIA': ['EIA_API_KEY'],
-    'X': ['X_BEARER_TOKEN'],
-    'KALSHI_DEMO': ['KALSHI_API_KEY_ID'],
     'COINBASE_ACCOUNT': ['COINBASE_API_KEY_NAME'],
 }
 
@@ -69,6 +63,26 @@ def private_path(cfg, setting):
     if os.name != 'nt' and stat.S_IMODE(p.stat().st_mode) & 0o077:
         raise SafeError(f'{setting}: restrict permissions to owner only')
     return p
+
+
+def private_pem(cfg, setting):
+    """Accept PEM exports with literal newlines without rewriting protected files."""
+    value = private_path(cfg, setting).read_text(encoding='ascii').strip()
+    # Credential portals commonly export a PEM as a JSON string containing \\n.
+    # Decode only line endings, never arbitrary escapes or executable content.
+    return value.replace('\\r\\n', '\n').replace('\\n', '\n').encode('ascii')
+
+
+def alpha_notice(data):
+    """Classify access notices; never return provider text which may echo a key."""
+    if not isinstance(data, dict) or not any(k in data for k in ('Note', 'Information', 'Error Message')):
+        return None
+    text = ' '.join(str(data.get(k, '')) for k in ('Note', 'Information', 'Error Message')).lower()
+    if any(term in text for term in ('rate limit', 'per day', 'per minute', 'frequency')):
+        return 'RATE_LIMITED', 'Alpha Vantage quota reached; wait for the provider quota to reset'
+    if 'premium' in text:
+        return 'ENTITLEMENT_REQUIRED', 'Alpha Vantage requires premium access for this endpoint; check your subscription'
+    return 'DEGRADED', 'Alpha Vantage rejected the request; check key validity and endpoint access'
 
 
 # Restrict every network call to these specific read operations. POST /info is

@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 const config = {
+  distDir: process.env.TRADERX_NEXT_DIST || ".next",
   outputFileTracingRoot: path.dirname(fileURLToPath(import.meta.url)),
   poweredByHeader: false,
   devIndicators: false,

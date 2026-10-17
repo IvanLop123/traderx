@@ -25,7 +25,7 @@ def main():
     production='--production' in sys.argv
     if production and not listening(3000):
         frontend=ROOT/'frontend'
-        files=sorted(p for p in frontend.rglob('*') if p.is_file() and not any(part in ('node_modules','.next') for part in p.relative_to(frontend).parts) and p.suffix in ('.json','.mjs','.ts','.tsx','.css','.svg'))
+        files=sorted(p for p in frontend.rglob('*') if p.is_file() and not any(part in ('node_modules','.next','.next-acceptance','.next-selection-acceptance') for part in p.relative_to(frontend).parts) and p.suffix in ('.json','.mjs','.ts','.tsx','.css','.svg'))
         signature=hashlib.sha256(b''.join(str(p.relative_to(frontend)).encode()+p.read_bytes() for p in files)).hexdigest()
         stamp=ROOT/'data/frontend_build.sha256'
         if not (frontend/'.next/BUILD_ID').exists() or not stamp.exists() or stamp.read_text()!=signature:
@@ -45,7 +45,7 @@ def main():
                 with urllib.request.urlopen(f'http://127.0.0.1:{port}/api/v1/health',timeout=10) as response:
                     import json
                     health=json.load(response)
-                    if health.get('execution')!='internal_paper_only':raise ValueError()
+                    if health.get('execution') not in ('internal_paper_only','internal_and_alpaca_paper') or health.get('live_trading') is not False:raise ValueError()
             except Exception:raise RuntimeError(f'Port {port} is occupied by an unverified service; close it before launching TraderX.') from None
             print(f'{name}: port {port} already active; using existing local service.');continue
         stream=(ROOT/f'data/{name}.log').open('a');logs.append(stream)

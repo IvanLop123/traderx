@@ -15,11 +15,6 @@ async def test_unconfigured_scheduler_starts_no_network(db):
     scheduler=ScheduledIngestion(db,p,Mock(),asyncio.Event(),settings())
     assert scheduler.start()==[]
 
-async def test_news_batch_is_one_provider_request(db):
-    p=Mock();p.cfg={'ALPHA_VANTAGE_API_KEY':'fixture'};p.alpha=AsyncMock()
-    scheduler=ScheduledIngestion(db,p,Mock(),asyncio.Event(),settings())
-    await scheduler.cycle('alpha_vantage')
-    p.alpha.assert_awaited_once_with('news','AAPL,MSFT')
 
 async def test_sec_unchanged_source_fetched_once(db):
     p=Mock();p.cfg={'SEC_USER_AGENT':'Fixture contact@example.org'}
@@ -63,3 +58,15 @@ async def test_completed_analysis_retains_document_asset(db):
     record=db.records('analysis','TEST')[0]
     assert record['payload']['document_id']==stored['id'] and record['payload']['provider']=='local'
     with Session(db.engine) as s:assert s.get(Job,stored['id']).state=='complete'
+
+async def test_missing_quote_does_not_skip_stock_history(db):
+    from backend.providers.market import ProviderError
+    p=Mock();p.cfg={'ALPACA_API_KEY':'fixture','ALPACA_API_SECRET':'fixture'}
+    p.alpaca_quote=AsyncMock(side_effect=ProviderError('MISSING_DATA','No two-sided IEX quote'))
+    p.alpaca_bars=AsyncMock(return_value=[])
+    cfg={**settings(),'lookback_days':730}
+    scheduler=ScheduledIngestion(db,p,Mock(),asyncio.Event(),cfg)
+    await scheduler.cycle('alpaca')
+    assert p.alpaca_bars.await_count==2
+    assert db.setting('provider_alpaca')['quote_status']=='MISSING_DATA'
+    assert db.setting('provider_alpaca')['status']=='WORKING_READ_ONLY'

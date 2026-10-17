@@ -3,12 +3,13 @@ import asyncio
 import hashlib
 import json
 import time
+import math
 from datetime import date, datetime, timezone, timedelta
 from urllib.parse import quote
 import httpx
 from backend.schemas.contracts import Bar, Event, AssetIdentifier, RawRecord, now
 from backend.storage.database import Database
-from scripts.provider_common import config, validate_sec_contact
+from scripts.provider_common import config, validate_sec_contact, alpha_notice
 
 class ProviderError(Exception):
     def __init__(self,status,detail): self.status=status; self.detail=detail
@@ -17,10 +18,14 @@ def normalized(provider):
     def decorate(fn):
         async def call(self,*args,**kwargs):
             try:return await fn(self,*args,**kwargs)
+            except ProviderError as exc:
+                previous=self.db.setting('provider_'+provider,{})
+                self.db.set_setting('provider_'+provider,{**previous,'status':exc.status,'last_error':exc.detail})
+                raise
             except (KeyError,TypeError,ValueError):
                 previous=self.db.setting('provider_'+provider,{})
-                self.db.set_setting('provider_'+provider,{**previous,'status':'DEGRADED','last_error':'Unexpected provider data shape; no synthetic replacement'})
-                raise ProviderError('DEGRADED','Unexpected provider data shape') from None
+                self.db.set_setting('provider_'+provider,{**previous,'status':'MALFORMED_RESPONSE','last_error':'Unexpected provider data shape; no synthetic replacement'})
+                raise ProviderError('MALFORMED_RESPONSE','Unexpected provider data shape') from None
         return call
     return decorate
 
@@ -29,19 +34,17 @@ class MarketProviders:
         self.db=db; self.cfg=credentials if credentials is not None else config(); self.transport=transport
         self.locks={}; self.last={}
     def status(self):
-        required={'alpaca':['ALPACA_API_KEY','ALPACA_API_SECRET'],'alpha_vantage':['ALPHA_VANTAGE_API_KEY'],
-                  'sec':['SEC_USER_AGENT'],'fred':['FRED_API_KEY'],'eia':['EIA_API_KEY'],'x':['X_BEARER_TOKEN']}
+        purposes={'coinbase':'Public spot crypto quotes and history','hyperliquid':'Read-only crypto funding and market context','alpaca':'US equities/ETF history and quotes; indicative options snapshots','sec':'Dated filings and insider disclosures','fred':'Vintage-aware macroeconomic research','eia':'Energy observations','manual':'Authorized document imports'}
+        required={'alpaca':['ALPACA_API_KEY','ALPACA_API_SECRET'],'sec':['SEC_USER_AGENT'],'fred':['FRED_API_KEY'],'eia':['EIA_API_KEY']}
         result=[]
-        for name in ['coinbase','hyperliquid','kalshi','alpaca','alpha_vantage','sec','fred','eia','x','gs_quant','manual']:
+        for name,purpose in purposes.items():
             missing=[k for k in required.get(name,[]) if not self.cfg.get(k)]
-            default={'provider':name,'status':'NOT_CONFIGURED' if missing else 'NOT_CHECKED','missing_fields':missing,'last_success':None,'last_error':None,'latency_ms':None}
-            if name=='x' and self.cfg.get('X_API_ENABLED')!='true': default['status']='DISABLED'
-            if name=='manual': default['status']='READY_FOR_IMPORT'
             saved=self.db.setting('provider_'+name,{})
-            if missing or default['status']=='DISABLED':saved={k:v for k,v in saved.items() if k not in ('status','missing_fields')}
-            result.append({**default,**saved})
+            status='NOT_CONFIGURED' if missing else saved.get('status','READY_FOR_IMPORT' if name=='manual' else 'NOT_CHECKED')
+            classification='working' if status.startswith('WORKING') else 'unavailable due to entitlement' if status=='ENTITLEMENT_REQUIRED' else 'disabled' if status=='DISABLED' else 'optional'
+            result.append({**saved,'provider':name,'status':status,'classification':classification,'scope':purpose,'missing_fields':missing})
         return result
-    async def request(self,name,url,*,method='GET',params=None,headers=None,body=None,raw=False):
+    async def request(self,name,url,*,method='GET',params=None,headers=None,body=None,raw=False,persist_raw=True):
         # URLs are constructed only by these adapters, never accepted from user input.
         lock=self.locks.setdefault(name,asyncio.Lock())
         async with lock:
@@ -56,15 +59,19 @@ class MarketProviders:
                         if r.status_code==429: raise ProviderError('RATE_LIMITED','Provider rate limit; deferred to next cycle')
                         if r.status_code>=500 and attempt<2:
                             await asyncio.sleep(2**attempt); continue
-                        if r.status_code in (401,403): raise ProviderError('DEGRADED','Authentication or entitlement rejected')
+                        if r.status_code==401: raise ProviderError('AUTHENTICATION_FAILED','Provider rejected authentication; check configured credentials')
+                        if r.status_code==403: raise ProviderError('ENTITLEMENT_REQUIRED','Provider denied this data entitlement')
+                        if r.status_code==404: raise ProviderError('UNSUPPORTED_ENDPOINT','Provider endpoint or asset is unavailable')
                         r.raise_for_status(); break
                 data=r.text if raw else r.json()
+                notice=alpha_notice(data) if name=='alpha_vantage' else None
+                if notice: raise ProviderError(*notice)
                 if isinstance(data,dict) and any(k in data for k in ('Error Message','Information','Note','error')):
                     raise ProviderError('DEGRADED','Provider returned an error or entitlement notice')
                 raw_payload={'text':data} if isinstance(data,str) else data
                 raw_id=hashlib.sha256((name+url+json.dumps(raw_payload,sort_keys=True)).encode()).hexdigest()
-                self.db.put('raw',RawRecord(id=raw_id,provider=name,source_reference=url,payload=raw_payload),record_id=raw_id)
-                self.db.set_setting('provider_'+name,{'status':'WORKING_DEMO' if name=='kalshi' else 'WORKING_READ_ONLY',
+                if persist_raw:self.db.put('raw',RawRecord(id=raw_id,provider=name,source_reference=url,payload=raw_payload),record_id=raw_id)
+                self.db.set_setting('provider_'+name,{'status':'WORKING_READ_ONLY',
                     'last_success':now().isoformat(),'last_error':None,'latency_ms':round((time.monotonic()-start)*1000),'missing_fields':[]})
                 return data
             except Exception as e:
@@ -82,11 +89,26 @@ class MarketProviders:
         if existing and self.db.get(rid+'d'): return rid
         timestamp=published_at or now()
         e=Event(id=rid,source=provider,provider=provider,event_type=event_type,
-                assets=[AssetIdentifier(symbol=symbol,asset_class='perpetual' if provider=='hyperliquid' else 'prediction' if provider=='kalshi' else 'stock' if provider in ('sec','alpaca','alpha_vantage') else 'crypto')] if symbol else [],event_at=timestamp,published_at=timestamp,
+                assets=[AssetIdentifier(symbol=symbol,asset_class='perpetual' if provider=='hyperliquid' else 'stock' if provider in ('sec','alpaca','alpha_vantage') else 'crypto')] if symbol else [],event_at=timestamp,published_at=timestamp,
                 payload=payload,source_reference=source or provider)
         self.db.put('event',e,symbol,record_id=rid,available_at=e.available_at().isoformat())
         self.db.put(event_type,{**payload,'evidence_id':rid,'provider':provider,'source_reference':source,'observed_at':now().isoformat()},symbol,record_id=rid+'d')
         return rid
+    async def forward_quote(self,symbol):
+        if symbol.endswith('-USD'):
+            data=await self.request('coinbase','https://api.exchange.coinbase.com/products/'+quote(symbol,safe='')+'/book',params={'level':1})
+            bid,ask=data['bids'][0],data['asks'][0]
+            timestamp=data.get('time')
+            if not timestamp:raise ProviderError('MISSING_DATA','Book snapshot has no exchange timestamp')
+            q={'symbol':symbol,'provider':'coinbase','timestamp':timestamp,'bid':float(bid[0]),'ask':float(ask[0]),'bid_size':float(bid[1]),'ask_size':float(ask[1]),'sequence':data.get('sequence'),'depth_units':'base_units'}
+        else:
+            q=await self.alpaca_quote(symbol)
+            # Current shares convention; older snapshots are not used as live quotes.
+            if datetime.fromisoformat(q['timestamp'].replace('Z','+00:00')).date()<date(2025,11,3):raise ProviderError('MISSING_DATA','Quote predates verified share-unit convention')
+            q={**q,'provider':'alpaca','depth_units':'base_units'}
+        q['observed_at']=now().isoformat()
+        self.db.put('forward_quote',q,symbol)
+        return q
     @normalized('coinbase')
     async def coinbase_quote(self,symbol):
         url='https://api.exchange.coinbase.com/products/'+quote(symbol,safe='')+'/ticker'
@@ -129,21 +151,22 @@ class MarketProviders:
         url='https://api.hyperliquid.xyz/info'
         fills=await self.request('hyperliquid',url,method='POST',body={'type':'userFills','user':address})
         portfolio=await self.request('hyperliquid',url,method='POST',body={'type':'portfolio','user':address})
-        data={'wallet':address,'fills':fills,'portfolio':portfolio}
+        fills=sorted(fills,key=lambda f:f.get('time',0))
+        from backend.intelligence.quant import trader_metrics
+        data={'wallet':address,'fills':fills,'portfolio':portfolio,'metrics':trader_metrics(fills)}
         self.persist('hyperliquid','trader',data,source=url); return data
-    @normalized('kalshi')
-    async def kalshi(self):
-        url='https://external-api.demo.kalshi.co/trade-api/v2/markets'
-        data=await self.request('kalshi',url,params={'limit':30,'status':'open','mve_filter':'exclude'})
-        for m in data['markets']: self.persist('kalshi','prediction_market',m,m['ticker'],source=url)
-        return data['markets']
     @normalized('alpaca')
     async def alpaca_quote(self,symbol):
         self.require('Alpaca','ALPACA_API_KEY','ALPACA_API_SECRET')
         url='https://data.alpaca.markets/v2/stocks/'+quote(symbol,safe='')+'/quotes/latest'
         data=await self.request('alpaca',url,params={'feed':self.cfg.get('ALPACA_DATA_FEED','iex')},headers={'APCA-API-KEY-ID':self.cfg['ALPACA_API_KEY'],'APCA-API-SECRET-KEY':self.cfg['ALPACA_API_SECRET']})
-        q=data['quote']; bid=float(q['bp']); ask=float(q['ap'])
-        if bid<=0 or ask<bid:raise ValueError('Quote is not tradable')
+        q=data['quote']
+        if q is None:raise ProviderError('MISSING_DATA','No IEX quote is currently available for '+symbol)
+        bid=float(q['bp']); ask=float(q['ap'])
+        if not math.isfinite(bid) or not math.isfinite(ask) or bid<0 or ask<0:raise ValueError('Invalid quote values')
+        if bid==0 or ask==0:
+            raise ProviderError('MISSING_DATA','IEX has no two-sided quote for '+symbol+' (often outside the session); history remains available')
+        if ask<bid:raise ProviderError('DEGRADED','Crossed IEX quote; no tradable midpoint saved')
         payload={'symbol':symbol,'price':(bid+ask)/2,'bid':bid,'ask':ask,'timestamp':q['t'],'asset_class':'stock','price_type':'quote_midpoint','bid_size':q.get('bs'),'ask_size':q.get('as')}
         recent=self.db.records('bar',symbol,limit=1000)
         if recent:
@@ -170,24 +193,6 @@ class MarketProviders:
             if not token: break
             params['page_token']=token
         return result
-    @normalized('alpha_vantage')
-    async def alpha(self,kind,symbol,quarter='',observation_date=None):
-        self.require('Alpha Vantage','ALPHA_VANTAGE_API_KEY')
-        function={'news':'NEWS_SENTIMENT','transcript':'EARNINGS_CALL_TRANSCRIPT','options':'HISTORICAL_OPTIONS'}[kind]
-        params={'function':function,'apikey':self.cfg['ALPHA_VANTAGE_API_KEY']}
-        params['tickers' if kind=='news' else 'symbol']=symbol
-        if quarter: params['quarter']=quarter
-        if observation_date and kind=='options':params['date']=date.fromisoformat(str(observation_date)).isoformat()
-        url='https://www.alphavantage.co/query'
-        data=await self.request('alpha_vantage',url,params=params)
-        rid=self.persist('alpha_vantage',kind,data,symbol if ',' not in symbol else '',source=url)
-        if kind in ('news','transcript'):
-            from backend.intelligence.ingest import ingest_alpha_text
-            ingest_alpha_text(self.db,kind,data,symbol)
-        elif kind=='options':
-            from backend.intelligence.options import derive_options
-            derive_options(self.db,rid+'d')
-        return data
     @normalized('sec')
     async def sec(self,cik):
         self.require('SEC','SEC_USER_AGENT')
@@ -212,6 +217,22 @@ class MarketProviders:
         self.persist('sec','filing_source',{'text':text,'cik':cik},str(cik),source=url)
         return text
     @normalized('fred')
+    async def fred_initial(self,series):
+        from backend.research.features import MACRO
+        if series not in MACRO:raise ValueError('Unsupported research macro series')
+        self.require('FRED','FRED_API_KEY')
+        url='https://api.stlouisfed.org/fred/series/observations'
+        data=await self.request('fred',url,params={'api_key':self.cfg['FRED_API_KEY'],'file_type':'json','series_id':series,
+            'realtime_start':'2022-01-01','realtime_end':'9999-12-31','observation_start':'2022-01-01','output_type':4,'limit':100000})
+        if data.get('count',0)>len(data.get('observations',[])):raise ValueError('Incomplete macro release history')
+        existing=self.db.records('macro_initial',series,limit=1)
+        observations={r['date']:r for r in (existing[0]['payload']['observations'] if existing else [])}
+        for row in data['observations']:
+            if row['date'] not in observations or row['realtime_start']<observations[row['date']]['realtime_start']:observations[row['date']]=row
+        data['observations']=[observations[k] for k in sorted(observations)]
+        self.persist('fred','macro_initial',{'series':series,'observations':data['observations'],'policy':'initial_release_only_next_NY_midnight'},series,source=url)
+        return data
+    @normalized('fred')
     async def fred(self,series,vintage):
         self.require('FRED','FRED_API_KEY')
         url='https://api.stlouisfed.org/fred/series/observations'
@@ -223,12 +244,5 @@ class MarketProviders:
     async def eia(self):
         self.require('EIA','EIA_API_KEY')
         url='https://api.eia.gov/v2/electricity/retail-sales/data/'
-        data=await self.request('eia',url,params={'api_key':self.cfg['EIA_API_KEY'],'frequency':'monthly','data[0]':'price','length':100,'sort[0][column]':'period','sort[0][direction]':'desc'})
+        data=await self.request('eia',url,params={'api_key':self.cfg['EIA_API_KEY'],'frequency':'monthly','data[0]':'price','facets[stateid][]':'US','facets[sectorid][]':'ALL','length':1,'sort[0][column]':'period','sort[0][direction]':'desc'})
         self.persist('eia','energy',data,source=url); return data
-    @normalized('x')
-    async def social(self,query):
-        if self.cfg.get('X_API_ENABLED')!='true': raise ProviderError('DISABLED','X is disabled; paid access requires explicit configuration')
-        self.require('X','X_BEARER_TOKEN')
-        url='https://api.x.com/2/tweets/search/recent'
-        data=await self.request('x',url,params={'query':query,'max_results':10,'tweet.fields':'created_at,author_id,public_metrics'},headers={'Authorization':'Bearer '+self.cfg['X_BEARER_TOKEN']})
-        self.persist('x','social',data,source=url); return data

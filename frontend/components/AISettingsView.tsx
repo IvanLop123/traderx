@@ -26,12 +26,12 @@ export function AISettingsView({ data, act }: { data: Data; act: any }) {
           detail={data.current_model || "No model active"}
         />
         <Stat
-          label="TODAY · OPENAI"
+          label="TODAY · API BILLING"
           value={"$" + data.usage.daily_cost.toFixed(5)}
           detail={"Budget $" + settings.daily_budget}
         />
         <Stat
-          label="THIS MONTH · OPENAI"
+          label="THIS MONTH · API BILLING"
           value={"$" + data.usage.monthly_cost.toFixed(5)}
           detail={"Budget $" + settings.monthly_budget}
         />
@@ -53,7 +53,7 @@ export function AISettingsView({ data, act }: { data: Data; act: any }) {
           {[
             ["off", "AI Off", "All quantitative systems stay active."],
             ["local", "Local AI", "Use a model running on this Mac."],
-            ["openai", "OpenAI", "Cloud analysis with strict cost limits."],
+            ["openai", "Cloud AI", "Metered API text extraction with budget limits."],
             ["hybrid", "Hybrid", "Local first. Explicit escalation only."],
           ].map(([key, label, desc]) => (
             <button
@@ -83,7 +83,7 @@ export function AISettingsView({ data, act }: { data: Data; act: any }) {
           </label>
           <label className="toggle-row">
             <div>
-              <strong>Allow automated OpenAI calls</strong>
+              <strong>Allow automated cloud AI calls</strong>
               <small>Requires automation and available budget</small>
             </div>
             <input
@@ -94,7 +94,7 @@ export function AISettingsView({ data, act }: { data: Data; act: any }) {
           </label>
           <label className="toggle-row">
             <div>
-              <strong>GPT escalation</strong>
+              <strong>Cloud escalation</strong>
               <small>Only explicitly difficult, allowlisted tasks</small>
             </div>
             <input
@@ -142,8 +142,9 @@ export function AISettingsView({ data, act }: { data: Data; act: any }) {
               />
             </label>
             <label>
-              OpenAI model
+              Cloud model
               <input
+                list="cloud-models"
                 value={settings.openai_model}
                 onChange={(e) => set("openai_model", e.target.value)}
               />
@@ -151,15 +152,17 @@ export function AISettingsView({ data, act }: { data: Data; act: any }) {
             <label>
               Escalation model
               <input
+                list="cloud-models"
                 placeholder="Disabled until explicitly configured"
                 value={settings.escalation_model}
                 onChange={(e) => set("escalation_model", e.target.value)}
               />
             </label>
           </div>
+          <datalist id="cloud-models">{["gpt-5.4-nano-2026-03-17","gpt-6-luna","gpt-6.1-sol","gpt-6-astra"].map(model=><option key={model} value={model}/>)}</datalist>
           <p className="panel-note">
             Keys stay in the backend .env file. Local servers do not need a key
-            unless you enabled authentication. Unpriced OpenAI models are
+            unless you enabled authentication. Unpriced Cloud models are
             blocked until their rates are configured.
           </p>
         </Panel>
@@ -186,8 +189,8 @@ export function AISettingsView({ data, act }: { data: Data; act: any }) {
           <div className="callout">
             <p>
               {data.openai_budget_paused
-                ? "OpenAI analysis is paused by the budget or rate gate."
-                : "Budget reservations are checked before each request."}{" "}
+                ? "API analysis is paused by the budget or rate gate."
+                : "API budget reservations are checked before each request."}{" "}
               Market ingestion, signals and portfolio accounting continue
               independently.
             </p>

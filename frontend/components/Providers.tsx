@@ -3,6 +3,8 @@ import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { api, number, date } from "@/lib/api";
 import { Badge, Panel, JsonView } from "./Common";
+import { NewsEvents } from "./NewsEvents";
+import { SystemResearch } from "./SystemResearch";
 type Data = Record<string, any>;
 export function Providers({ data, act }: { data: Data; act: any }) {
   const [provider, setProvider] = useState("sec");
@@ -18,54 +20,12 @@ export function Providers({ data, act }: { data: Data; act: any }) {
         <ShieldCheck size={17} /> API keys are never sent to the browser.
         Public, credentialed and disabled providers are reported separately.
       </div>
-      <Panel title="Provider health" eyebrow="LIVE CONNECTIVITY">
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>PROVIDER</th>
-                <th>STATUS</th>
-                <th>LAST SUCCESS</th>
-                <th>LATENCY</th>
-                <th>SETUP / DIAGNOSTIC</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.providers.map((p: Data) => (
-                <tr key={p.provider}>
-                  <td>
-                    <strong>
-                      {p.provider.replaceAll("_", " ").toUpperCase()}
-                    </strong>
-                  </td>
-                  <td>
-                    <Badge
-                      tone={
-                        p.status.startsWith("WORKING")
-                          ? "green"
-                          : p.status === "ERROR"
-                            ? "red"
-                            : ""
-                      }
-                    >
-                      {p.status.replaceAll("_", " ")}
-                    </Badge>
-                  </td>
-                  <td>{date(p.last_success)}</td>
-                  <td>
-                    {p.latency_ms ? number(p.latency_ms, 0) + " ms" : "—"}
-                  </td>
-                  <td className="muted">
-                    {p.last_error ||
-                      p.missing_fields?.join(", ") ||
-                      "No credentials needed"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
+      <div className="status-summary"><span>{data.providers.filter((p:Data)=>p.status.startsWith('WORKING')).length} working</span><span>{data.providers.filter((p:Data)=>p.status==='ENTITLEMENT_REQUIRED').length} need entitlement</span><span>Trading disabled</span></div>
+      <div className="health-grid">{data.providers.map((p:Data)=>{const working=p.status.startsWith('WORKING');const label=p.status==='WORKING_LOCAL'?'Local · working':working?'Working':p.status==='ENTITLEMENT_REQUIRED'?'Entitlement required':p.status==='DISABLED'?'Disabled':p.status==='READY_FOR_IMPORT'?'Manual import':p.status==='NOT_CONFIGURED'?'Not configured':'Needs attention';return <article className="health-card" key={p.provider}><header><h2>{p.provider.replaceAll('_',' ').toUpperCase()}</h2><Badge tone={working?'green':p.status==='ENTITLEMENT_REQUIRED'?'amber':''}>{label}</Badge></header><p>{p.scope||'Read-only research data.'}</p><details><summary>Connection details</summary><p>Last success: {date(p.last_success)}</p><p>Status: {p.status.replaceAll('_',' ')}</p><p>{p.last_error||p.missing_fields?.join(', ')||'No outstanding diagnostic.'}</p>{p.quote_status&&<p>Quotes: {p.quote_status} · History: {p.history_status}</p>}</details></article>})}</div>
+      <NewsEvents health/>
+      <SystemResearch/>
+      <details><summary className="section-copy">Advanced data tools and stream diagnostics</summary>
+      <Panel title="Public market stream" eyebrow="COINBASE"><div className="metric-list"><div><span>Connection</span><Badge>{data.stream?.status||"NOT_STARTED"}</Badge></div><div><span>Messages observed</span><strong>{number(data.stream?.messages,0)}</strong></div><div><span>Last update</span><strong>{date(data.stream?.updated_at)}</strong></div><div><span>Book sampling / trades</span><strong>{data.stream?.books_enabled?"Books on":"Books off"} · {data.stream?.trades_enabled?"Trades on":"Trades off"}</strong></div></div><p className="panel-note">Public quotes stream without AI. REST polling remains independent. Optional order books are sampled every five seconds; trade gaps are recorded and bounded recovery never claims complete history.</p></Panel>
       <div className="two-col">
         <Panel title="Fetch configured provider data">
           <div className="form-grid">
@@ -82,11 +42,8 @@ export function Providers({ data, act }: { data: Data; act: any }) {
                   "sec",
                   "fred",
                   "eia",
-                  "alpha_vantage",
                   "alpaca",
                   "hyperliquid",
-                  "kalshi",
-                  "x",
                 ].map((p) => (
                   <option key={p}>{p}</option>
                 ))}
@@ -103,54 +60,6 @@ export function Providers({ data, act }: { data: Data; act: any }) {
               <label>
                 SEC company CIK
                 <input value={cik} onChange={(e) => setCik(e.target.value)} />
-              </label>
-            )}
-            {provider === "alpha_vantage" && (
-              <>
-                <label>
-                  Information type
-                  <select
-                    value={kind}
-                    onChange={(e) => setKind(e.target.value)}
-                  >
-                    <option value="news">News</option>
-                    <option value="transcript">Earnings transcript</option>
-                    <option value="options">Historical options</option>
-                  </select>
-                </label>
-                {kind === "transcript" && (
-                  <label>
-                    Quarter
-                    <input
-                      placeholder="2026Q2"
-                      value={quarter}
-                      onChange={(e) => setQuarter(e.target.value.toUpperCase())}
-                    />
-                  </label>
-                )}
-                {kind === "options" && (
-                  <label>
-                    Observation date (optional)
-                    <input
-                      type="date"
-                      value={observationDate}
-                      onChange={(e) => setObservationDate(e.target.value)}
-                    />
-                    <small>
-                      Blank uses the previous trading session. Requires provider
-                      entitlement.
-                    </small>
-                  </label>
-                )}
-              </>
-            )}
-            {provider === "x" && (
-              <label>
-                Search query
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
               </label>
             )}
           </div>
@@ -183,6 +92,7 @@ export function Providers({ data, act }: { data: Data; act: any }) {
           </p>
         </Panel>
       </div>
+      </details>
     </>
   );
 }

@@ -11,11 +11,10 @@ from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from provider_common import ROOT, KEY_GROUPS, config, private_path, safety_errors, validate_sec_contact
+from provider_common import ROOT, KEY_GROUPS, config, private_pem, safety_errors, validate_sec_contact
 from dotenv import dotenv_values
 
-PACKAGES = ('openai', 'alpaca-py', 'gs-quant', 'coinbase-advanced-py', 'httpx',
-            'python-dotenv', 'cryptography', 'PyJWT')
+PACKAGES = ('httpx', 'python-dotenv', 'cryptography', 'PyJWT', 'fastapi', 'sqlalchemy')
 
 
 def main():
@@ -57,8 +56,6 @@ def main():
         problems.append('COINBASE_API_KEY_NAME: expected organizations/.../apiKeys/...')
     if cfg.get('ALLOW_BILLABLE_TESTS') != 'false':
         warnings.append('Billable-tests setting differs from the delivered zero-spend default')
-    if cfg.get('X_API_ENABLED') != 'false':
-        warnings.append('X enabled; no request runs without the separate billable-test opt-in')
     secret_dir = ROOT / 'secrets'
     if not secret_dir.is_dir():
         problems.append('secrets/ directory is missing')
@@ -79,7 +76,7 @@ def main():
         if not cfg.get(id_name):
             continue
         try:
-            key = serialization.load_pem_private_key(private_path(cfg, setting).read_bytes(), None)
+            key = serialization.load_pem_private_key(private_pem(cfg, setting), None)
             if setting.startswith('KALSHI'):
                 valid = isinstance(key, ed25519.Ed25519PrivateKey) or (isinstance(key, rsa.RSAPrivateKey) and key.key_size >= 2048)
             else:

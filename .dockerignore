@@ -19,6 +19,5 @@ data
 **/*.pfx
 **/credentials.json
 **/service_key.json
-.codex
-.openai
+**/.*
 !.env.example

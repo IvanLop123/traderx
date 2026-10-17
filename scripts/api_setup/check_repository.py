@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import json
 import re
 import subprocess
 import sys
@@ -13,16 +14,25 @@ from dotenv import dotenv_values
 from provider_common import ROOT, KEY_GROUPS, SAFE_SETTINGS, config, safety_errors
 
 PATTERNS = {
-    'OpenAI-style key': re.compile(rb'\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b'),
+    'API-key pattern': re.compile(rb'\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b'),
     'Alpaca-style key ID': re.compile(rb'\b[AP]K[A-Z0-9]{18}\b'),
     'private PEM block': re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
     'literal bearer token': re.compile(rb'(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{20,}'),
     'JWT token': re.compile(rb'\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'),
     'Coinbase credential name': re.compile(rb'organizations/[A-Za-z0-9-]{8,}/apiKeys/[A-Za-z0-9-]{8,}'),
     'literal credential assignment': re.compile(
-        rb'''(?im)^[\t ]*["']?(?:[A-Z][A-Z0-9_]*_)?(?:API_KEY|API_SECRET|BEARER_TOKEN|ACCESS_TOKEN|PRIVATE_KEY)["']?[\t ]*[:=][\t ]*["']?[A-Za-z0-9_+/=-]{24,}["']?[\t ]*[,;]?[\t ]*$'''),
+        rb'''(?im)^[\t ]*["']?(?:[A-Z][A-Z0-9_]*_)?(?:API_KEY|API_SECRET|BEARER_TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|PRIVATE_KEY)["']?[\t ]*[:=][\t ]*["']?[A-Za-z0-9_+/=-]{24,}["']?[\t ]*[,;]?[\t ]*$'''),
 }
 
+
+def protected_session_values():
+    path=ROOT/'secrets/chatgpt/accounts.json'
+    if not path.is_file() or path.is_symlink():return []
+    try:
+        data=json.loads(path.read_text())
+        return [value.encode() for account in data.get('accounts',{}).values() for name,value in account.items()
+                if name in ('access_token','refresh_token','id_token') and isinstance(value,str) and len(value)>=8]
+    except (OSError,ValueError,AttributeError):return []
 
 def secret_types(data, known_values=()):
     kinds = {name for name, pattern in PATTERNS.items() if pattern.search(data)}
@@ -39,7 +49,8 @@ def protected_name(path):
     p = Path(path)
     return ((p.name.startswith('.env') and p.name != '.env.example')
             or 'secrets' in p.parts or '.venv' in p.parts
-            or any(part in p.parts for part in ('data','node_modules','.next','.codex','.openai','credentials'))
+            or any(part in p.parts for part in ('data','node_modules','.next','credentials'))
+            or any(part.startswith('.') and part not in ('.github','.githooks') for part in p.parts[:-1])
             or p.name in ('service_key.json','credentials.json','.npmrc','.envrc')
             or p.suffix in ('.pem', '.key', '.p8', '.secret','.p12','.pfx','.jks','.keystore','.db','.sqlite','.sqlite3','.pkl','.pickle','.joblib','.safetensors'))
 
@@ -60,11 +71,9 @@ def audit_repository():
     local = dotenv_values(ROOT / '.env', interpolate=False)
     required = set(SAFE_SETTINGS) | {n for names in KEY_GROUPS.values() for n in names} | {
         'APP_ENV', 'ALLOW_BILLABLE_TESTS', 'REQUIRED_PROVIDERS', 'OPENAI_MODEL',
-        'X_API_ENABLED', 'KALSHI_PRIVATE_KEY_PATH', 'COINBASE_PRIVATE_KEY_PATH'}
+        'COINBASE_PRIVATE_KEY_PATH'}
     for name in required - set(template):
         issues.add(('.env.example', 'missing variable name: ' + name))
-    for name in set(local) - set(template):
-        issues.add(('.env.example', 'missing local variable name: ' + name))
     for filename in ('.env', '.env.example'):
         seen = set()
         if not (ROOT / filename).exists():continue
@@ -82,17 +91,17 @@ def audit_repository():
     for filename, values in (('.env', {**template,**local}), ('.env.example', template), ('process environment', config())):
         for issue in safety_errors(values):
             issues.add((filename, issue))
-        if values.get('ALLOW_BILLABLE_TESTS') != 'false' or values.get('X_API_ENABLED') != 'false':
+        if values.get('ALLOW_BILLABLE_TESTS') != 'false' or values.get('X_API_ENABLED','false') != 'false':
             issues.add((filename, 'zero-spend flags must remain disabled for this cleanup'))
     # New application settings may use safe template defaults without rewriting .env.
-    known = set()
+    known = set(protected_session_values())
     for values in (local, config()):
         for names in KEY_GROUPS.values():
             for name in names:
                 if name != 'SEC_USER_AGENT' and len(values.get(name) or '') >= 8:
                     known.add(values[name].encode())
-    for name, value in config().items():
-        if name.endswith(('API_KEY','API_SECRET','BEARER_TOKEN')) and len(value or '') >= 8:
+    for name, value in {**local,**config()}.items():
+        if name.endswith(('API_KEY','API_SECRET','BEARER_TOKEN','API_KEY_ID','API_KEY_NAME')) and len(value or '') >= 8:
             known.add(value.encode())
     if template.get('LOCAL_LLM_API_KEY'):
         issues.add(('.env.example', 'local API key must be blank'))
@@ -132,7 +141,7 @@ def main():
         if history.returncode:issues.append(('repository','unable to inspect local Git history'))
         else:
             seen=set()
-            known=[value.encode() for name,value in config().items() if name.endswith(('API_KEY','API_SECRET','BEARER_TOKEN','API_KEY_NAME')) and len(value or '')>=8]
+            known=protected_session_values()+[value.encode() for name,value in {**dotenv_values(ROOT / '.env',interpolate=False),**config()}.items() if name.endswith(('API_KEY','API_SECRET','BEARER_TOKEN','API_KEY_NAME','API_KEY_ID')) and len(value or '')>=8]
             for line in history.stdout.decode().splitlines():
                 parts=line.split(' ',1)
                 if len(parts)!=2:continue

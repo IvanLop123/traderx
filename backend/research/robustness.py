@@ -65,7 +65,7 @@ def compare_strategies(bars,trial_count=1):
     df=ordered_bars(bars)
     if len(df)<180:raise ValueError('At least 180 daily bars are required for this comparison')
     start=61;cut=int(len(df)*.75);dev_end=cut
-    rows=[];paths={};development=[];annual=365 if '-' in str(df.iloc[0].symbol) else 252
+    rows=[];paths={};development_paths={};holdout_returns={};development=[];annual=365 if '-' in str(df.iloc[0].symbol) else 252
     for name in STRATEGIES:
         weights=weights_for(df,name)
         development_result=simulate_weights(df,weights,start=start,end=dev_end)
@@ -78,6 +78,8 @@ def compare_strategies(bars,trial_count=1):
                      'probabilistic_sharpe_vs_zero':probabilistic_sharpe(holdout['returns']),
                      'return_observations':len(holdout['returns'])})
         paths[name]=holdout['curve']
+        if name not in ('cash','buy_hold'):
+            development_paths[name]=development_result['returns'];holdout_returns[name]=holdout['returns']
     # Choose using development only; holdout comparisons are reporting, not optimization.
     eligible=[i for i,n in enumerate(STRATEGIES) if n not in ('cash','buy_hold')]
     selected=max(eligible,key=lambda i:development[i])
@@ -91,11 +93,12 @@ def compare_strategies(bars,trial_count=1):
                       'test_start':df.iloc[indices[test[0]]].timestamp,'test_end':df.iloc[indices[test[-1]]].timestamp,
                       'purge_bars':1,'mse':float(np.mean((pred-actual)**2)),'zero_forecast_mse':float(np.mean(actual**2)),
                       'direction_accuracy':float(np.mean((pred>0)==(actual>0)))})
-    return {'strategies':rows,'selected_on_development_only':STRATEGIES[selected],'holdout_curves':paths,'walk_forward_folds':folds,
+    from backend.research.governance import strategy_family,cscv_diagnostic
+    return {'statistical_governance':strategy_family(holdout_returns),'development_cscv':cscv_diagnostic(development_paths),'strategies':rows,'selected_on_development_only':STRATEGIES[selected],'holdout_curves':paths,'walk_forward_folds':folds,
             'split':{'development_start':df.iloc[start].timestamp,'development_end':df.iloc[cut-1].timestamp,'holdout_start':df.iloc[cut].timestamp,'holdout_end':df.iloc[-1].timestamp},
             'trial_count':trial_count,'tested_strategy_count':len(STRATEGIES),'deployment_status':'RESEARCH_ONLY','data_policy':'retrospective_completed_daily_bars',
             'warnings':['No universally best trading algorithm is established by this comparison.',
-                        'Short single-market sample; not a replication of multi-decade diversified futures research.',
+                        'Short single-market sample; not a replication of multi-decade diversified market research.',
                         'Holdout results become exploratory once inspected or reused. No automatic promotion to trading.',
                         'Probabilistic Sharpe assumes sufficiently independent observations; autocorrelation and multiple trials weaken the inference.',
-                        'Fixed return Sharpe statistics are not a deflated Sharpe estimate or PBO; do not interpret them as such.']}
+                        'The CSCV diagnostic covers this fixed development family only. No deflated Sharpe or undocumented-trial correction is claimed.']}

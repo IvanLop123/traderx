@@ -35,13 +35,6 @@ class GuardTests(unittest.TestCase):
             changed = dict(SAFE_SETTINGS, **{name: 'unsafe'})
             self.assertTrue(safety_errors(changed))
 
-    def test_x_never_reads_without_spending_opt_in(self):
-        probe = Probe({'X_API_ENABLED': 'true', 'X_BEARER_TOKEN': 'test-placeholder'})
-        try:
-            with patch.object(probe.reader, 'request', side_effect=AssertionError('No network expected')):
-                self.assertEqual(probe.x()[0], 'REQUIRES_PAYMENT_APPROVAL')
-        finally:
-            probe.reader.close()
 
     def test_empty_public_data_is_not_success(self):
         probe = Probe({})
@@ -56,7 +49,7 @@ class GuardTests(unittest.TestCase):
         probe = Probe({})
         try:
             with patch.object(probe.reader, 'request', side_effect=AssertionError('No network expected')):
-                for method in ('openai', 'alpaca', 'alpha', 'sec', 'fred', 'eia', 'kalshi_account', 'coinbase_account'):
+                for method in ('openai', 'alpaca', 'sec', 'fred', 'eia', 'coinbase_account'):
                     self.assertEqual(getattr(probe, method)()[0], 'NOT_CONFIGURED')
         finally:
             probe.reader.close()
